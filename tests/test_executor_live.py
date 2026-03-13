@@ -35,7 +35,8 @@ async def test_live_executor_agent_execution():
 import os
 def main():
     print("Deploying artifacts...")
-    with open(".agents/deploy_log.txt", "w") as f:
+    os.makedirs("logs", exist_ok=True)
+    with open("logs/deploy_log.txt", "w") as f:
         f.write("Deploy successful.")
 main()
 ```
