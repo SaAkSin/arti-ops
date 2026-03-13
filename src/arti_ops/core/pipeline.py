@@ -1,11 +1,10 @@
 import os
 import asyncio
+import logging
 from typing import AsyncGenerator
-from google.adk import Runner
-from google.adk import Agent
+from google.adk import Runner, Agent
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
-from typing import AsyncGenerator
 
 from ..agents.profiler import get_profiler_agent
 from ..agents.architect import get_architect_agent
@@ -15,50 +14,145 @@ from ..agents.executor import get_executor_agent
 from ..tools.bookstack import BookStackToolset
 from ..tools.gws_chat import GwsChatTool
 from ..tools.sandbox import SandboxTool
+from ..tools.file_io import FileIOToolset
 
-class PartiOpsPipeline:
+logger = logging.getLogger(__name__)
+
+class ArtiOpsPipeline:
     def __init__(self, target_project_id: str):
         self.target_project_id = target_project_id
         
         # 1. 툴 선언
         self.bookstack_tool = BookStackToolset()
+        self.file_io_tool = FileIOToolset()
+        self.sandbox_tool = SandboxTool()
         self.gws_chat_tool = GwsChatTool()
-        self.sandbox_tool_factory = SandboxTool()
         
-        try:
-            self.sandbox_executor = self.sandbox_tool_factory.get_executor()
-        except ImportError:
-            self.sandbox_executor = None
-            # TUI 환경에서 로깅 모듈을 통해 안내 가능하도록 향후 추가
+        # 2. 에이전트 선언 (각 역할별 도구 주입)
+        self.profiler = get_profiler_agent(tools=[self.bookstack_tool])
+        self.architect = get_architect_agent(tools=[]) # 기획 에이전트는 외부에 툴 노출 없이 추론만 집중
+        self.verifier = get_verifier_agent(tools=[self.gws_chat_tool])
+        self.executor = get_executor_agent(tools=[self.file_io_tool, self.sandbox_tool, self.bookstack_tool])
         
-        # 2. 에이전트 선언
-        self.profiler = get_profiler_agent()
-        self.architect = get_architect_agent()
-        self.verifier = get_verifier_agent()
-        self.executor = get_executor_agent()
-        
-        # Runner (로컬 상태 연동 등을 지원하는 실제 adk 구현에 맞게 조정)
-        self.runner = Runner(
-            app_name="arti-ops-pipeline",
-            # 향후 Multi-agent 시스템으로 Orchestrator를 넣을 수 있지만 
-            # 초기 버전에서는 메인 agent 하나 또는 순차 호출 방식을 정의해야 합니다.
-            # ADK v2.0 스펙에 맞춰 여기서는 일단 profiler를 진입점으로 둡니다.
-            agent=self.profiler,
-            session_service=InMemorySessionService(),
+        # 세션 서비스 및 HITL 상태 관리
+        self.session_service = InMemorySessionService()
+        self._pause_event = asyncio.Event()
+        self._is_approved = False
+
+    def _create_runner(self, agent: Agent) -> Runner:
+        return Runner(
+            app_name=f"arti-ops-{agent.name}",
+            agent=agent,
+            session_service=self.session_service,
             auto_create_session=True
         )
 
     async def run(self, command_prompt: str, session_id: str = None) -> AsyncGenerator[any, None]:
         """
-        초기 프롬프트를 전송하여 파이프라인(Profiler)을 실행시킵니다.
+        초기 프롬프트를 전송하여 파이프라인(Profiler -> [Architect -> Verifier] -> Executor)을 실행시킵니다.
         """
-        message_content = Content(role="user", parts=[Part.from_text(text=command_prompt)])
-        async for event in self.runner.run_async(user_id="cli_user", session_id=session_id or "default_session", new_message=message_content):
+        session_id = session_id or f"sess_{self.target_project_id}"
+        current_input = command_prompt
+        
+        # 1. Profiler Phase (단일 실행)
+        logger.info("--- Starting context_profiler Phase ---")
+        runner_prof = self._create_runner(self.profiler)
+        msg_prof = Content(role="user", parts=[Part.from_text(text=current_input)])
+        prof_text = ""
+        
+        async for event in runner_prof.run_async(user_id="cli_user", session_id=session_id, new_message=msg_prof):
             yield event
+            if getattr(event, "content", None) and getattr(event.content, "parts", None):
+                prof_text += "".join([part.text for part in event.content.parts if part.text])
+                
+        current_input = f"[context_profiler 에이전트의 산출물/보고서]\n{prof_text}\n\n위 산출물을 바탕으로 당신에게 주어진 임무를 수행하세요." if prof_text else "이전 단계 산출물 없음"
+        
+        # 2. Architect & Verifier While Loop (최대 3회)
+        max_retries = 3
+        retry_count = 0
+        verifier_passed = False
+        
+        while retry_count < max_retries and not verifier_passed:
+            # Architect (기획)
+            logger.info(f"--- Starting skill_architect Phase (Try {retry_count+1}/{max_retries}) ---")
+            runner_arch = self._create_runner(self.architect)
+            msg_arch = Content(role="user", parts=[Part.from_text(text=current_input)])
+            arch_text = ""
+            
+            async for event in runner_arch.run_async(user_id="cli_user", session_id=session_id, new_message=msg_arch):
+                yield event
+                if getattr(event, "content", None) and getattr(event.content, "parts", None):
+                    arch_text += "".join([part.text for part in event.content.parts if part.text])
+            
+            verifier_input = f"[skill_architect 에이전트의 산출물/보고서]\n{arch_text}\n\n위 산출물을 바탕으로 당신에게 주어진 임무를 수행하세요. 반려할 사유가 있다면 반려(reject/fail)하십시오." if arch_text else "산출물 없음"
+            
+            # Verifier (검증)
+            logger.info(f"--- Starting critical_verifier Phase (Try {retry_count+1}/{max_retries}) ---")
+            runner_ver = self._create_runner(self.verifier)
+            msg_ver = Content(role="user", parts=[Part.from_text(text=verifier_input)])
+            ver_text = ""
+            
+            async for event in runner_ver.run_async(user_id="cli_user", session_id=session_id, new_message=msg_ver):
+                yield event
+                
+                # 중단(Pause) 이벤트(HITL) 감지
+                is_paused = False
+                if isinstance(event, dict) and event.get("status") == "pending_approval":
+                    is_paused = True
+                elif getattr(event, "__class__", None) and getattr(event.__class__, "__name__", "") == "PauseEvent":
+                    is_paused = True
+                    
+                if is_paused:
+                    logger.info("Pipeline paused for HITL approval. Waiting for resume()...")
+                    self._pause_event.clear()
+                    self._is_approved = False
+                    await self._pause_event.wait()
+                    
+                    if not self._is_approved:
+                        ver_text += "\n\n[Human Review] 반려됨."
+                        reject_msg = Content(role="system", parts=[Part.from_text(text="**Human reviewer rejected the deployment.**")])
+                        yield type("DummyRejectEvent", (), {"author": "System", "content": reject_msg})()
+                    else:
+                        ver_text += "\n\n[Human Review] 승인됨."
+                        approve_msg = Content(role="system", parts=[Part.from_text(text="**Human reviewer approved. Resuming...**")])
+                        yield type("DummyApproveEvent", (), {"author": "System", "content": approve_msg})()
+                    continue
 
-    async def resume(self, session_id: str, action_response: dict) -> AsyncGenerator[any, None]:
+                if getattr(event, "content", None) and getattr(event.content, "parts", None):
+                    ver_text += "".join([part.text for part in event.content.parts if part.text])
+            
+            # Verifier 결과 분석 (간단한 키워드 기반)
+            lower_ver_text = ver_text.lower()
+            if "반려" in lower_ver_text or "reject" in lower_ver_text or "실패" in lower_ver_text or "failed" in lower_ver_text:
+                logger.warning(f"Verifier rejected the plan. Retrying... ({retry_count+1}/{max_retries})")
+                retry_count += 1
+                current_input = f"[critical_verifier 에이전트의 피드백 (반려 사유)]\n{ver_text}\n\n위 피드백(오류/반려 사유)을 바탕으로 기존 코드를 수정/보완하는 산출물을 다시 제출하세요."
+            else:
+                verifier_passed = True
+                logger.info("Verifier passed the plan. Proceeding to Executor.")
+                current_input = f"[critical_verifier 에이전트의 산출물/보고서]\n{ver_text}\n\n위 산출물을 바탕으로 당신에게 주어진 임무를 수행하세요."
+                
+        if not verifier_passed:
+            logger.error("Pipeline failed to pass Verifier after maximum retries.")
+            fail_msg = Content(role="system", parts=[Part.from_text(text="**Pipeline Failed: Verifier rejected the plan after maximum retries.**")])
+            yield type("DummyRejectEvent", (), {"author": "System", "content": fail_msg})()
+            return
+            
+        # 3. Executor Phase
+        logger.info("--- Starting deployment_executor Phase ---")
+        runner_exe = self._create_runner(self.executor)
+        msg_exe = Content(role="user", parts=[Part.from_text(text=current_input)])
+        
+        async for event in runner_exe.run_async(user_id="cli_user", session_id=session_id, new_message=msg_exe):
+            yield event
+            
+        logger.info("--- Pipeline Completed Successfully ---")
+
+    async def resume(self, session_id: str, action_response: dict) -> None:
         """
-        HITL 등 이유로 중단되었던(Pause) 세션을 다시 재개합니다. (향후 callback 연동)
+        HITL 등 이유로 중단되었던(Pause) 세션을 다시 재개합니다.
+        승인(approved) 시 이어서 파이프라인이 진행되도록 Event를 set() 합니다.
         """
-        # 현재 ADK Runner에서 지원하는 resume 로직에 맞게 연동 (임시 구현)
-        yield {"status": "resumed"}
+        logger.info(f"Resuming pipeline for session {session_id} with response: {action_response}")
+        self._is_approved = action_response.get("approved", False)
+        self._pause_event.set()

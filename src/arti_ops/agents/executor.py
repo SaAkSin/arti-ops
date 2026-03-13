@@ -1,7 +1,7 @@
 import os
 from google.adk import Agent
 
-def get_executor_agent() -> Agent:
+def get_executor_agent(tools: list = None) -> Agent:
     """
     샌드박스 안정성 검증을 마친 최종 Artifact를 호스트(개발자 OS) 파일 시스템에 반영하고,
     BookStack 서버에 역 동기화(Release Notes)를 퍼블리시 하는 실행 전담 에이전트.
@@ -19,5 +19,6 @@ def get_executor_agent() -> Agent:
     return Agent(
         name="deployment_executor",
         instruction=instructions,
+        tools=tools or [],
         model=os.getenv("GEMINI_MODEL_FLASH", "gemini-2.5-flash")
     )

@@ -1,7 +1,7 @@
 import os
 from google.adk import Agent
 
-def get_verifier_agent() -> Agent:
+def get_verifier_agent(tools: list = None) -> Agent:
     """
     Architect가 생성한 배포 산출물을 Red-Team 관점에서 검증하는 에이전트.
     Global 정책(L1) 위반 여부나 파괴적 변경을 탐지합니다.
@@ -19,5 +19,6 @@ def get_verifier_agent() -> Agent:
     return Agent(
         name="critical_verifier",
         instruction=instructions,
+        tools=tools or [],
         model=os.getenv("GEMINI_MODEL_PRO", "gemini-2.5-pro")
     )

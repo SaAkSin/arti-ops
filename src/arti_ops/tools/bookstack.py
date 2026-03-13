@@ -136,10 +136,18 @@ class BookStackToolset(BaseToolset):
                     
                 page_id = data[0].get("id")
                 
-                # 페이지 내용 덮어쓰기 (PUT)
+                # 페이지 내용 가져오기 (GET)
                 page_url = f"{self.api_url}/pages/{page_id}"
+                get_res = await client.get(page_url, headers=headers)
+                get_res.raise_for_status()
+                existing_markdown = get_res.json().get("markdown", "")
+                
+                # 내용 이어붙이기 (Append)
+                updated_markdown = f"{existing_markdown}\n\n---\n\n## New Deployment\n\n{diff_md}"
+                
+                # 페이지 내용 덮어쓰기 (PUT)
                 payload = {
-                    "markdown": diff_md
+                    "markdown": updated_markdown
                 }
                 
                 put_res = await client.put(page_url, headers=headers, json=payload)

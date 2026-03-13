@@ -3,6 +3,9 @@ import asyncio
 from typing import Dict, Any
 from google.adk.tools import LongRunningFunctionTool
 from pydantic import ConfigDict, Field
+import logging
+
+logger = logging.getLogger(__name__)
 
 class GwsChatTool(LongRunningFunctionTool):
     """
@@ -28,7 +31,7 @@ class GwsChatTool(LongRunningFunctionTool):
             conflict_reason (str): 충돌 사유나 특이사항
         """
         if not self.gws_space_id:
-            print("Warning: GWS_SPACE_ID is not set. Skipped CLI webhook.")
+            logger.warning("GWS_SPACE_ID is not set. Skipped CLI webhook.")
             return
 
         message_body = (
@@ -49,12 +52,12 @@ class GwsChatTool(LongRunningFunctionTool):
             stdout, stderr = await process.communicate()
             
             if process.returncode == 0:
-                print(f"[{project_id}] GWS 메시지 발송 완료 via CLI.")
+                logger.info(f"[{project_id}] GWS 메시지 발송 완료 via CLI.")
             else:
-                print(f"[{project_id}] GWS 메시지 발송 실패: {stderr.decode('utf-8')}")
+                logger.error(f"[{project_id}] GWS 메시지 발송 실패: {stderr.decode('utf-8')}")
 
         except Exception as e:
-            print(f"gws cli 호출 중 에러 발생: {e}")
+            logger.exception(f"gws cli 호출 중 에러 발생: {e}")
     
     # Run은 LongRunningFunctionTool의 표준 호출 메서드를 재정의 또는 확장에 사용
     async def run(self, project_id: str, diff_md: str, conflict_reason: str) -> Dict[str, Any]:

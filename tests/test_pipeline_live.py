@@ -3,16 +3,16 @@ import pytest
 from dotenv import load_dotenv
 load_dotenv()
 
-from arti_ops.core.pipeline import PartiOpsPipeline
+from arti_ops.core.pipeline import ArtiOpsPipeline
 
 @pytest.mark.asyncio
 @pytest.mark.skipif("GEMINI_API_KEY" not in os.environ, reason="Env vars are not set")
 async def test_live_pipeline_execution():
     """
-    실제 Gemini API와 연결된 PartiOpsPipeline의 초기 구동(Runner)이 정상적인지 확인합니다.
+    실제 Gemini API와 연결된 ArtiOpsPipeline의 초기 구동(Runner)이 정상적인지 확인합니다.
     """
     target_project_id = "TEST-LIVE-123"
-    pipeline = PartiOpsPipeline(target_project_id)
+    pipeline = ArtiOpsPipeline(target_project_id)
     
     # 파이프라인 실행: 무거운 작업이나 툴 호출을 막기 위해 가벼운 인사만 보냄
     prompt = "안녕! 이건 라이브 통합 테스트야. 추가 작업이나 파일 탐색 없이 그냥 정상 종료(답변)해줘."

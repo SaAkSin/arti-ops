@@ -1,7 +1,7 @@
 import os
 from google.adk import Agent
 
-def get_architect_agent() -> Agent:
+def get_architect_agent(tools: list = None) -> Agent:
     """
     L1, L2, L3 컨텍스트를 받아 최종 로컬 환경에 적용할 
     배포용 파이썬 스크립트 도출과 병합(Mix-in) 정책을 생성하는 핵심 지능 에이전트.
@@ -22,5 +22,6 @@ def get_architect_agent() -> Agent:
     return Agent(
         name="skill_architect",
         instruction=instructions,
+        tools=tools or [],
         model=os.getenv("GEMINI_MODEL_PRO", "gemini-2.5-pro")
     )
