@@ -1,5 +1,5 @@
 import os
-from google.adk.agent import Agent
+from google.adk import Agent
 
 def get_verifier_agent() -> Agent:
     """
@@ -17,9 +17,7 @@ def get_verifier_agent() -> Agent:
     """
 
     return Agent(
-        id="verifier",
-        name="Critical Verifier",
-        instructions=instructions,
-        tools=["GwsChatTool"],
+        name="critical_verifier",
+        instruction=instructions,
         model=os.getenv("GEMINI_MODEL_PRO", "gemini-2.5-pro")
     )

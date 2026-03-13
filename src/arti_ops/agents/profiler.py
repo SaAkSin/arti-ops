@@ -1,5 +1,5 @@
 import os
-from google.adk.agent import Agent
+from google.adk import Agent
 
 def get_profiler_agent() -> Agent:
     """
@@ -15,9 +15,7 @@ def get_profiler_agent() -> Agent:
     """
 
     return Agent(
-        id="profiler",
-        name="Context Profiler",
-        instructions=instructions,
-        tools=["BookStackToolset"], # ToolName 등록. Runner 쪽에서 맵핑 예정
+        name="context_profiler",
+        instruction=instructions,
         model=os.getenv("GEMINI_MODEL_FLASH", "gemini-2.5-flash")
     )

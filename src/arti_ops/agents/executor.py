@@ -1,5 +1,5 @@
 import os
-from google.adk.agent import Agent
+from google.adk import Agent
 
 def get_executor_agent() -> Agent:
     """
@@ -17,9 +17,7 @@ def get_executor_agent() -> Agent:
     """
 
     return Agent(
-        id="executor",
-        name="Deployment Executor",
-        instructions=instructions,
-        tools=["SandboxTool", "BookStackToolset"],
+        name="deployment_executor",
+        instruction=instructions,
         model=os.getenv("GEMINI_MODEL_FLASH", "gemini-2.5-flash")
     )
