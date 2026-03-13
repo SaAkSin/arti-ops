@@ -36,16 +36,17 @@ class GwsChatTool(LongRunningFunctionTool):
         )
 
         try:
-            # gws cli 실행 시 프로젝트 내부의 자격 증명을 가리키도록 환경 고립화 적용
+            # gws cli 실행 시 프로젝트 내부의 자격 증명을 가리키도록 환경변수 고립화 적용
+            custom_env = os.environ.copy()
+            custom_env["GOOGLE_WORKSPACE_CLI_CONFIG_DIR"] = os.path.abspath("credentials")
+            
             process = await asyncio.create_subprocess_exec(
-                "gws", 
-                "--client-secret", "credentials/client_secret.json",
-                "--token", "credentials/token.json",
-                "chat", "send",
+                "gws", "chat", "send",
                 "--space", self.gws_space_id,
                 "--message", message_body,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
+                env=custom_env
             )
             stdout, stderr = await process.communicate()
             
