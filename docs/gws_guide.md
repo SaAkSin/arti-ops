@@ -3,8 +3,21 @@
 `arti-ops`는 정책 동기화 검증 과정에서 자동화로 결정할 수 없는 심각한 룰 충돌이나 파괴적 변경 사항을 감지했을 때, Human-in-the-Loop(HITL) 방식을 도입하여 관리자(PM)에게 최종 결정권을 위임합니다. 이 문서는 구글 워크스페이스(GWS) 챗봇 웹훅을 프로젝트에 통합하는 방법을 설명합니다.
 
 ## 1. GWS CLI 설치 및 연동
-1. 시스템 레벨에서 GWS CLI(`gws`) 도구가 설치되어 있어야 합니다.
-2. `gws auth` 등을 통해 인증 토큰이 활성화된 상태여야 합니다. 
+`arti-ops` 내부에서 직접 gws를 설치하거나 관리하지 않습니다. **사전 준비된 로컬 OS 환경**에서 인증이 완료되어 있어야 워크플로우 통과가 가능합니다.
+
+### 1-A. 설치 방법
+* MacOS (Homebrew): `brew install gws`
+* Linux (Binary):
+  ```bash
+  curl -Lo gws https://github.com/kimtree/gws/releases/latest/download/gws_linux_amd64
+  chmod +x gws
+  sudo mv gws /usr/local/bin/
+  ```
+
+### 1-B. 연동 및 인증 (1회성)
+1. 구글 인증 세션을 연결합니다: `gws auth`
+2. 생성된 웹페이지 가이드에 따라 Google 계정에 로그인합니다.
+3. 인증이 완료되면 정상적으로 gws 명령어를 사용할 준비가 끝납니다.
 
 ## 2. 프로젝트 환경변수 설정
 메시지를 발송할 대상 Space ID를 `arti-ops` 프로젝트 루트의 `.env` 파일에 다음과 같이 추가합니다.
