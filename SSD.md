@@ -18,7 +18,7 @@ Pure Google ADK(Python)의 내장 객체들을 적극 활용하여 시스템을 
 
 [ Integration Layer (ADK Tools) ]
   ├── 📚 BookStackToolset (RestApiTool) : BookStack API 통신 (Read/Write)
-  ├── 💬 GwsChatTool (LongRunningFunctionTool) : HITL 승인 웹훅 및 대기
+  ├── 💬 GwsChatTool (LongRunningFunctionTool) : HITL 승인 위한 gws CLI 구동 및 대기
   └── 🐳 SandboxTool (ContainerCodeExecutor) : Docker 기반 안전 격리 실행 환경
 
 ```
@@ -116,7 +116,7 @@ loop 최대 3회 반복 (ADK LoopAgent)
         Verifier -> ADK : State에 반려 사유 기록 (Architect 재기획 지시)
     else 치명적 정책 충돌 (HITL Trigger)
         Verifier -> ADK : [LongRunningTool] GwsChatTool 호출
-        ADK -> GWS : [웹훅] 충돌 내용(Diff) 및 승인/수정 요청 발송
+        ADK -> GWS : [gws CLI] 충돌 내용(Diff) 및 승인/수정 요청 발송
         note right of ADK : 워크플로우 일시 정지 (Yield/Pause)
         GWS -> User : 알림 수신 및 내용 검토
         User -> GWS : "로컬 룰을 무시하고 글로벌 룰 강제 적용해" (피드백)
