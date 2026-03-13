@@ -42,14 +42,39 @@ class BookStackToolset(BaseTool):
         if scope_tag == "workspace" and not project_id:
             return "Error: Workspace scope requires a project_id."
             
-        # 실제 구현 시에는 북스택 페이지 검색 API를 호출하여 markdown 컨텐츠를 가져와야 합니다.
-        # 아래는 가상의 테스트용 Mocking 응답입니다.
+        search_query = ""
         if scope_tag == "global":
-            return "# Global Rules (L1)\n1. Never use root access.\n2. All secrets must be encrypted."
-        elif scope_tag == "workspace" and project_id:
-            return f"# Workspace {project_id} Rules (L2)\n1. Use PostgreSQL\n2. Maintain 80% test coverage."
-        
-        return "No policies found."
+            search_query = "[Antigravity] Global Policy"
+        elif scope_tag == "workspace":
+            search_query = f"[Workspace] {project_id}"
+            
+        async with httpx.AsyncClient() as client:
+            headers = self.get_headers()
+            
+            # 검색 API를 통해 해당 이름을 가진 페이지 검색
+            search_url = f"{self.api_url}/search"
+            params = {"query": f'"{search_query}" +type:page'}
+            
+            try:
+                res = await client.get(search_url, headers=headers, params=params)
+                res.raise_for_status()
+                data = res.json().get("data", [])
+                
+                if not data:
+                    return f"No policies found for: {search_query}"
+                    
+                # 첫 번째 매칭되는 페이지의 id 추출
+                page_id = data[0].get("id")
+                
+                # 페이지 내용(markdown) 추출 API
+                page_url = f"{self.api_url}/pages/{page_id}"
+                page_res = await client.get(page_url, headers=headers)
+                page_res.raise_for_status()
+                
+                return page_res.json().get("markdown", "")
+                
+            except Exception as e:
+                return f"Error connecting to BookStack API: {str(e)}"
 
     async def publish_sync_report(self, project_id: str, diff_md: str) -> str:
         """
@@ -62,7 +87,33 @@ class BookStackToolset(BaseTool):
         Returns:
             str: 업데이트 결과 메세지
         """
-        # 실제 구현에서는 BookStack API의 페이지 수정 (PUT) 호출을 진행합니다.
-        # Mocking
-        return f"Successfully updated Release Notes for project {project_id} with diff."
+        async with httpx.AsyncClient() as client:
+            headers = self.get_headers()
+            search_query = f"[Workspace] {project_id} Release Notes"
+            search_url = f"{self.api_url}/search"
+            params = {"query": f'"{search_query}" +type:page'}
+            
+            try:
+                res = await client.get(search_url, headers=headers, params=params)
+                res.raise_for_status()
+                data = res.json().get("data", [])
+                
+                if not data:
+                    return f"No Release Notes page found for {project_id}. Please create a page named '{search_query}' first."
+                    
+                page_id = data[0].get("id")
+                
+                # 페이지 내용 덮어쓰기 (PUT)
+                page_url = f"{self.api_url}/pages/{page_id}"
+                payload = {
+                    "markdown": diff_md
+                }
+                
+                put_res = await client.put(page_url, headers=headers, json=payload)
+                put_res.raise_for_status()
+                
+                return f"Successfully updated Release Notes for project {project_id}"
+                
+            except Exception as e:
+                return f"Error publishing sync report: {str(e)}"
 
