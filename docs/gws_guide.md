@@ -25,10 +25,12 @@ GWS CLI 구동을 위해서는 GCP(Google Cloud Platform) 프로젝트 내 OAuth
    - [Google Cloud Console - API 및 서비스 > 사용자 인증 정보](https://console.cloud.google.com/apis/credentials) 페이지에 접속합니다.
    - 본인이 소유한 프로젝트에서 **"사용자 인증 정보 만들기" > "OAuth 클라이언트 ID"**를 선택합니다.
    - 애플리케이션 유형을 **"데스크톱 앱(Desktop app)"**으로 선택하고 생성합니다.
-   - 생성된 클라이언트의 JSON 파일을 다운로드 받아 이름을 `client_secret.json`으로 변경한 후, 터미널 환경의 `~/.config/gws/client_secret.json` 경로에 배치합니다.
+   - 생성된 클라이언트의 JSON 파일을 다운로드 받아 이름을 `client_secret.json`으로 변경한 후, 프로젝트 루트 경로인 `credentials/client_secret.json` 에 배치합니다.
+   - ⚠️ `credentials/` 폴더는 `.gitignore` 처리되어 있어 안전합니다.
 
 3. **로그인 인증 (`gws auth login`)**
-   - 클라이언트 설정(1 또는 2)이 준비된 후 `gws auth login` 명령어를 실행합니다.
+   - 클라이언트 설정(1 또는 2)이 준비된 후 프로젝트 루트 디렉토리에서 아래 명령어를 실행합니다.
+   - `gws --client-secret credentials/client_secret.json --token credentials/token.json auth login`
    - 브라우저에 표시되는 가이드에 따라 Google 계정 접근 권한 부여를 수락합니다.
 
 4. 터미널 인증이 완료되면 정상적으로 gws 명령어를 사용할 준비가 끝납니다.
@@ -46,7 +48,8 @@ GWS_SPACE_ID="spaces/XXXXXXX"
 
 *   `CriticalVerifier` 에이전트가 "사람의 검토가 필요하다"고 판단하면, `run` 메서드를 호출합니다.
 *   에이전트가 해당 툴을 실행하는 즉시 메인 `Runner` 파이프라인의 **이벤트 스트림은 `Pause`(일시 정지) 상태로 전환**됩니다(Async Yield).
-*   파이썬 내부에서 `subprocess`나 비동기 쉘 코드를 통해 `gws chat send --space "$GWS_SPACE_ID" --message "..."` 명령을 실행하여 GWS 채널에 `Diff` 내용과 충돌 사유(`conflict_reason`)를 발송합니다.
+*   파이썬 내부에서 `subprocess`나 비동기 쉘 코드를 통해 프로젝트 종속 인증 옵션을 포함한 발송 명령을 실행합니다.
+    - 예시: `gws --client-secret credentials/client_secret.json --token credentials/token.json chat send --space "$GWS_SPACE_ID" --message "..."`
 
 ## 4. 백오피스(콜백)를 통한 Resume(재개) 처리 방법
 현재 `arti-ops` TUI/CLI 버전에서는 승인/거절 로직이 백엔드 REST API가 아닌 터미널 세션 내부에서 제어되거나, 별도의 API Gateway를 거쳐 콜백 주입(Callback Injection)으로 풀리게 진화될 예정입니다. 

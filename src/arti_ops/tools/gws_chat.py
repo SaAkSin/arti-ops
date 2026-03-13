@@ -36,9 +36,12 @@ class GwsChatTool(LongRunningFunctionTool):
         )
 
         try:
-            # gws cli 실행 예: gws chat send --space "spaces/XXXX" --message "..."
+            # gws cli 실행 시 프로젝트 내부의 자격 증명을 가리키도록 환경 고립화 적용
             process = await asyncio.create_subprocess_exec(
-                "gws", "chat", "send",
+                "gws", 
+                "--client-secret", "credentials/client_secret.json",
+                "--token", "credentials/token.json",
+                "chat", "send",
                 "--space", self.gws_space_id,
                 "--message", message_body,
                 stdout=asyncio.subprocess.PIPE,
