@@ -2,26 +2,32 @@ import os
 import httpx
 import logging
 from typing import Optional, Dict, Any
-from google.adk.tools import BaseTool
+from google.adk.tools import BaseTool, FunctionTool
+from google.adk.tools.base_toolset import BaseToolset
 
 logger = logging.getLogger(__name__)
 from pydantic import ConfigDict, Field
 
-class BookStackToolset(BaseTool):
+class BookStackToolset(BaseToolset):
     """
     BookStack API 통합을 위한 ADK Toolset.
     Global(L1) 및 Workspace(L2) 정책을 마크다운 형태로 가져오고, 
     배포 결과를 Release Notes로 퍼블리시합니다.
     """
     def __init__(self, **kwargs):
-        kwargs.setdefault("name", "BookStackToolset")
-        kwargs.setdefault("description", "Fetches global and workspace rules from BookStack and publishes release notes.")
-        super().__init__(**kwargs)
+        super().__init__()
         self.api_url = os.getenv("BOOKSTACK_API_URL", "")
         self.token_id = os.getenv("BOOKSTACK_TOKEN_ID", "")
         self.token_secret = os.getenv("BOOKSTACK_TOKEN_SECRET", "")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    async def get_tools(self, context=None) -> list[BaseTool]:
+        """ADK 에이전트가 호출할 기능들의 FunctionTool 리스트를 반환합니다."""
+        return [
+            FunctionTool(func=self.fetch_policies),
+            FunctionTool(func=self.publish_sync_report)
+        ]
     
     def get_headers(self) -> Dict[str, str]:
         """BookStack API 인증 헤더를 반환합니다."""
