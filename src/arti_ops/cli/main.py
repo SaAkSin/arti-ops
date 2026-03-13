@@ -47,7 +47,7 @@ class ArtiOpsApp(App):
         yield Footer()
 
     async def on_mount(self) -> None:
-        self.title = "arti-ops v2.0 Platform"
+        self.title = "arti-ops v0.1.0 Platform"
         self.sub_title = "ADK Policy Sync Environment"
         self.log_view.write_line("🚀 [System] Initializing Antigravity Agent Crew...")
         

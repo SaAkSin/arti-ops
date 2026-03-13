@@ -1,4 +1,4 @@
-# 🛠️ [SSD] arti-ops v2.0 시스템 및 서비스 명세서
+# 🛠️ [SSD] arti-ops v0.1.0 시스템 및 서비스 명세서
 
 ## 1. 시스템 아키텍처 개요 (System Architecture)
 

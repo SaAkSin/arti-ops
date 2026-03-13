@@ -1,4 +1,4 @@
-# arti-ops v2.0 (ADK 기반 AgentOps 플랫폼)
+# arti-ops v0.1.0 (ADK 기반 AgentOps 플랫폼)
 
 `arti-ops`는 사내 BookStack(위키)에 정의된 20개 이상의 다중 프로젝트 가이드라인과 전사(Global) 보안 정책을 개발자의 로컬 환경(`.agents/` 등)에 충돌 없이 동기화해 주는 **지능형 CLI / TUI 클라이언트**입니다.
 

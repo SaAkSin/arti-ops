@@ -1,4 +1,4 @@
-# 📄 [PRD] arti-ops v2.0 제품 요구사항 명세서
+# 📄 [PRD] arti-ops v0.1.0 제품 요구사항 명세서
 
 ## 1. 제품 개요 (Product Overview)
 
