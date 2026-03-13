@@ -1,3 +1,4 @@
+import os
 from google.adk.agent import Agent
 
 def get_architect_agent() -> Agent:
@@ -22,5 +23,6 @@ def get_architect_agent() -> Agent:
         id="architect",
         name="Skill Architect",
         instructions=instructions,
-        tools=[] 
+        tools=[],
+        model=os.getenv("GEMINI_MODEL_PRO", "gemini-2.5-pro")
     )
