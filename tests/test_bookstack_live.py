@@ -1,5 +1,9 @@
 import pytest
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from arti_ops.tools.bookstack import BookStackToolset
 
 # 이 테스트는 실제 .env 에 지정된 BookStack 서버를 조회합니다.

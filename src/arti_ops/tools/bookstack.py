@@ -10,14 +10,13 @@ class BookStackToolset(BaseTool):
     Global(L1) 및 Workspace(L2) 정책을 마크다운 형태로 가져오고, 
     배포 결과를 Release Notes로 퍼블리시합니다.
     """
-    api_url: str = Field(default_factory=lambda: os.getenv("BOOKSTACK_API_URL", ""))
-    token_id: str = Field(default_factory=lambda: os.getenv("BOOKSTACK_TOKEN_ID", ""))
-    token_secret: str = Field(default_factory=lambda: os.getenv("BOOKSTACK_TOKEN_SECRET", ""))
-
     def __init__(self, **kwargs):
         kwargs.setdefault("name", "BookStackToolset")
         kwargs.setdefault("description", "Fetches global and workspace rules from BookStack and publishes release notes.")
         super().__init__(**kwargs)
+        self.api_url = os.getenv("BOOKSTACK_API_URL", "")
+        self.token_id = os.getenv("BOOKSTACK_TOKEN_ID", "")
+        self.token_secret = os.getenv("BOOKSTACK_TOKEN_SECRET", "")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
