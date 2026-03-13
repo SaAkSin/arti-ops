@@ -62,10 +62,18 @@ class ArtiOpsApp(App):
             
             async for event in pipeline.run(command_prompt=prompt):
                 # Textual Log 위젯에 로그와 메세지 스트림 작성
-                # Event 객체의 타입에 따라 메세지 포맷팅
-                self.log_view.write_line(f"Event: {event}")
+                # Event 객체의 타입(Content 유무)에 따라 메세지 포맷팅
+                text_output = ""
+                if getattr(event, "content", None) and getattr(event.content, "parts", None):
+                    text_output = "".join([part.text for part in event.content.parts if part.text])
                 
-            self.log_view.write_line("✅ [System] Pipeline execution completed. You can quit (q) now.")
+                if text_output:
+                     self.log_view.write(text_output)
+                else:
+                     # 상태 전환 등 다른 시스템 이벤트 렌더링
+                     self.log_view.write_line(f"➤ [Event] {event.__class__.__name__}")
+                     
+            self.log_view.write_line("\n✅ [System] Pipeline execution completed. You can quit (q) now.")
         except Exception as e:
             self.log_view.write_line(f"❌ [Error] {str(e)}")
 
