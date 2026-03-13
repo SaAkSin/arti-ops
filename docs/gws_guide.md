@@ -15,9 +15,15 @@
   ```
 
 ### 1-B. 연동 및 인증 (1회성)
-1. 구글 인증 세션을 연결합니다: `gws auth`
-2. 생성된 웹페이지 가이드에 따라 Google 계정에 로그인합니다.
-3. 인증이 완료되면 정상적으로 gws 명령어를 사용할 준비가 끝납니다.
+GWS CLI 구동을 위해서는 GCP(Google Cloud Platform) 프로젝트 내 OAuth 동의 구성과 데스크톱 앱용 OAuth 클라이언트 ID가 필요합니다.
+
+1. **OAuth 클라이언트 구성 (`gws auth setup`)**
+   - 구글 클라우드 콘솔에 로그인할 수 있는 계정으로 터미널에서 `gws auth setup` 명령어를 실행하여 GCP 프로젝트를 할당하고 OAuth 클라이언트를 설정합니다.
+   - (또는 기존 GCP에서 다운로드 받은 `client_secret.json` 파일을 `~/.config/gws/client_secret.json` 에 직접 배치하셔도 무방합니다.)
+2. **로그인 인증 (`gws auth login`)**
+   - 클라이언트 설정이 준비된 후 `gws auth login` 명령어를 실행합니다.
+   - 브라우저에 표시되는 가이드에 따라 Google 계정 접근 권한 부여를 수락합니다.
+3. 터미널 인증이 완료되면 정상적으로 gws명령어를 사용할 준비가 끝납니다.
 
 ## 2. 프로젝트 환경변수 설정
 메시지를 발송할 대상 Space ID를 `arti-ops` 프로젝트 루트의 `.env` 파일에 다음과 같이 추가합니다.
