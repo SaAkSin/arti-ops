@@ -1,1 +1,39 @@
-.venv/\n__pycache__/\n*.db\n.env
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Build and Distribution
+build/
+dist/
+sdist/
+*.egg-info/
+*.egg
+
+# Testing and Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+*.db
+*.sqlite3
+
+# Dependencies
+uv.lock
