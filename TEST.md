@@ -59,10 +59,10 @@ Mocking을 거치지 않고, 로컬 시스템의 `.env`에 정의된 `BOOKSTACK_
 만약 `.env` 에 관련 키가 없다면 `@pytest.mark.skipif` 에 의해 자동으로 테스트가 스킵됩니다.
 로그 모드(`-s`)를 통해 HTTP 200 응답이 정상적으로 수신되고, 각 Page들이 하나의 완성된 마크다운으로 깔끔하게 디코딩되어 찍히는지 시각적으로 관찰할 수 있는 기능이 들어있습니다.
 
-### 4.3. `test_profiler.py`
-BookStack 서버와 로컬 환경을 조회하여 융합 컨텍스트를 도출하는 `Profiler` 에이전트의 생성 규칙을 검증합니다.
-ADK 규격에 맞추어 올바른 시스템 이름(`name`), 프롬프트 속성(`instruction`), 그리고 사용할 모델 변수(`GEMINI_MODEL_FLASH`)가 Pydantic 에러 없이 안전하게 할당되어 있는지 점검합니다.
+### 4.4. `test_architect.py` & `test_architect_live.py`
+BookStack 및 로컬에서 수집된 컨텍스트(L1, L2, L3)를 기반으로 최종 배포용 파이썬 스크립트를 작성하는 `SkillArchitect` 에이전트에 대한 검증입니다. 
+단위 테스트는 모델 할당(`GEMINI_MODEL_PRO`) 및 Pydantic 인스턴스 초기화 여부를 확인하며, `_live` 통합 테스트는 `venv` 환경변수에 기반하여 실제 Gemini-Pro 모델과 통신, 주어진 룰 제약 조건들(예: snake_case, logging 모듈 강제 등)을 지킨 온전한 ````python` 스크립트가 반환되는지 Stream 파싱 결과를 확인합니다.
 
 ## 5. 추가 테스트 작성 (진행중인 사항)
 
-향후 개발될 Agent 4종(`Profiler`, `Architect`, `Verifier`, `Executor`)에 대해서도 프롬프트 인스트럭션 추론 결과 및 State 머신의 변화를 추적(Mocking LLM)하는 단위 테스트가 `tests/test_agents.py` 등으로 지속 추가될 예정입니다.
+향후 개발될 Agent 2종(`Verifier`, `Executor`)에 대해서도 프롬프트 인스트럭션 추론 결과 및 State 머신의 변화를 추적(Mocking LLM)하는 단위 테스트가 지속 추가될 예정입니다.
