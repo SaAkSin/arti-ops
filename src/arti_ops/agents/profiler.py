@@ -1,7 +1,7 @@
 import os
 from google.adk import Agent
 
-def get_profiler_agent() -> Agent:
+def get_profiler_agent(tools: list = None) -> Agent:
     """
     BookStack 서버와 로컬 환경을 조회하여 융합 컨텍스트를 설계하는 Profiler 에이전트.
     주로 빠르고 경제적인 처리(Flash 모델)를 권장합니다.
@@ -17,5 +17,6 @@ def get_profiler_agent() -> Agent:
     return Agent(
         name="context_profiler",
         instruction=instructions,
+        tools=tools or [],
         model=os.getenv("GEMINI_MODEL_FLASH", "gemini-2.5-flash")
     )
