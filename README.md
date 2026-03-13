@@ -51,6 +51,17 @@ uv run arti-ops --help
 uv run arti-ops sync --workspace Project_Alpha
 ```
 
+## ⚙️ (참고) 개발자용 Rocky Linux 9 구동 가이드
+
+```bash
+# 1. 터미널 UI 깨짐 방지 (이모지 및 스피너 정상 출력)
+export LANG="en_US.UTF-8" 
+
+# 2. Podman 데몬 활성화 및 Docker 소켓 환경변수 매핑 (Sandbox 호환)
+systemctl --user enable --now podman.socket
+export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/podman/podman.sock"
+```
+
 ---
 
 ## 🛠 기술 스택

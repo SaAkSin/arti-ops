@@ -47,4 +47,7 @@ class SandboxTool(BaseToolset):
             return "\n\n".join(output_lines) if output_lines else "Success: No output produced."
         except Exception as e:
             logger.exception("Sandbox execution failed")
-            return f"Error executing code in sandbox: {e}"
+            error_msg = str(e)
+            if "Connection" in error_msg or "FileNotFoundError" in error_msg:
+                return f"Error: 샌드박스 엔진(Docker/Podman)에 연결할 수 없습니다. Linux 환경의 경우 터미널에서 'systemctl --user enable --now podman.socket' 실행 및 'export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock' 설정이 필요합니다. 상세 에러: {error_msg}"
+            return f"Error executing code in sandbox: {error_msg}"

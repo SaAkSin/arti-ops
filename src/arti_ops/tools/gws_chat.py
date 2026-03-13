@@ -42,12 +42,14 @@ class GwsChatTool(LongRunningFunctionTool):
 
         try:
             # gws cli 실행 시 사용자 OS의 기본 전역 자격 증명(~/.config/gws)을 인식하여 메시지를 발송합니다.
+            env = os.environ.copy() # Linux PATH 유실 방지
             process = await asyncio.create_subprocess_exec(
                 "gws", "chat", "+send",
                 "--space", self.gws_space_id,
                 "--text", message_body,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
+                env=env
             )
             stdout, stderr = await process.communicate()
             
