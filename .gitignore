@@ -36,8 +36,11 @@ htmlcov/
 *.sqlite3
 
 # Dependencies
-uv.lock
+# uv.lock 은 앱 재현성 보장을 위해 커밋하는 것을 권장합니다.
 
-# Logs
+# Logs & Credentials
 logs/*.log
 credentials/
+
+# Target Workspace (Local Sync Dir)
+.agents/
