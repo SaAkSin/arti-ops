@@ -1,19 +1,24 @@
 import os
 import httpx
 from typing import Optional, Dict, Any
-from google.adk.tools import RestApiTool
-from pydantic import BaseModel, ConfigDict, Field
+from google.adk.tools import BaseTool
+from pydantic import ConfigDict, Field
 
-class BookStackToolset(RestApiTool):
+class BookStackToolset(BaseTool):
     """
     BookStack API 통합을 위한 ADK Toolset.
     Global(L1) 및 Workspace(L2) 정책을 마크다운 형태로 가져오고, 
     배포 결과를 Release Notes로 퍼블리시합니다.
     """
-    api_url: str = Field(description="BookStack API Base URL", default_factory=lambda: os.getenv("BOOKSTACK_API_URL", ""))
-    token_id: str = Field(description="BookStack API Token ID", default_factory=lambda: os.getenv("BOOKSTACK_TOKEN_ID", ""))
-    token_secret: str = Field(description="BookStack API Token Secret", default_factory=lambda: os.getenv("BOOKSTACK_TOKEN_SECRET", ""))
-    
+    api_url: str = Field(default_factory=lambda: os.getenv("BOOKSTACK_API_URL", ""))
+    token_id: str = Field(default_factory=lambda: os.getenv("BOOKSTACK_TOKEN_ID", ""))
+    token_secret: str = Field(default_factory=lambda: os.getenv("BOOKSTACK_TOKEN_SECRET", ""))
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("name", "BookStackToolset")
+        kwargs.setdefault("description", "Fetches global and workspace rules from BookStack and publishes release notes.")
+        super().__init__(**kwargs)
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
     def get_headers(self) -> Dict[str, str]:
