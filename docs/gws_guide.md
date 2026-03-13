@@ -17,21 +17,28 @@
 ### 1-B. gcloud CLI 설치 및 애플리케이션 기본 인증 (ADC) 설정
 `gws` 도구가 Google API에 정상적으로 접근하고 `setup` 명령어를 수행하려면 로컬 환경에 `gcloud` CLI 툴이 필요합니다.
 
-**1. gcloud 설치 (Rocky Linux 9 환경 예시)**
-서버 환경에서 세팅이 필요하신 경우, Google Cloud 저장소를 추가한 뒤 `dnf` 패키지 관리자를 통해 설치해 주시면 됩니다.
-```bash
-sudo tee -a /etc/yum.repos.d/google-cloud-cli.repo << EOM
-[google-cloud-cli]
-name=Google Cloud CLI
-baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64
-enabled=1
-gpgcheck=1
-repo_gpgcheck=0
-gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
-EOM
+**1. gcloud CLI 설치**
 
-sudo dnf install google-cloud-cli
-```
+* **Mac OS 환경 (Homebrew 권장)**
+  ```bash
+  brew install --cask google-cloud-sdk
+  ```
+
+* **Linux (Rocky Linux 9 기준) 환경**
+  서버 환경에서 세팅이 필요하신 경우, Google Cloud 저장소를 추가한 뒤 `dnf` 패키지 관리자를 통해 설치해 주시면 됩니다.
+  ```bash
+  sudo tee -a /etc/yum.repos.d/google-cloud-cli.repo << EOM
+  [google-cloud-cli]
+  name=Google Cloud CLI
+  baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64
+  enabled=1
+  gpgcheck=1
+  repo_gpgcheck=0
+  gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+  EOM
+
+  sudo dnf install google-cloud-cli
+  ```
 
 **2. 초기화 및 로그인 (필수 과정)**
 설치가 완료되었다면, 터미널에서 다음 두 가지 명령어를 순서대로 실행하여 계정을 연결하고 프로젝트를 세팅해 주셔야 합니다.

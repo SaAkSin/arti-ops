@@ -6,9 +6,23 @@
 
 ---
 
-## 1. 운영체제 레벨 Docker 엔진 설치 (Rocky Linux 9 기준)
+## 1. 운영체제 레벨 Docker 엔진 설치
 
-ADK의 컨테이너 실행기는 내부적으로 호스트 시스템의 Docker 데몬(`dockerd`)과 소켓 통신을 하여 격리된 작업 컨테이너를 스핀업(Spin-Up) 시킵니다. 따라서 서버에 Docker 엔진 설치가 선행되어야 합니다.
+ADK의 컨테이너 실행기는 내부적으로 호스트 시스템의 Docker 데몬과 소켓 통신을 하여 격리된 작업 컨테이너를 스핀업(Spin-Up) 시킵니다. 따라서 서버 및 로컬 PC에 Docker 엔진 설치가 선행되어야 합니다.
+
+### [Option A] Mac OS (Apple Silicon / Intel) 환경
+가장 간편한 방법은 Homebrew를 통해 Docker Desktop이나 더 가벼운 OrbStack을 설치하는 것입니다.
+
+```bash
+# Docker Desktop 설치
+brew install --cask docker
+
+# (대안) 더 빠르고 가벼운 OrbStack 설치
+brew install --cask orbstack
+```
+*설치 후 애플리케이션 목록에서 실행하여 백그라운드 엔진(데몬)이 가동되도록 해야합니다.*
+
+### [Option B] Linux (Rocky Linux 9 기준) 환경
 
 ### 1-1. 기존 캐시 및 구버전 삭제 (선택)
 ```bash
