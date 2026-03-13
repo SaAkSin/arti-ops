@@ -1,4 +1,4 @@
-from google.adk.tools import ContainerCodeExecutor
+from typing import Any
 from pydantic import BaseModel, Field
 
 class SandboxTool(BaseModel):
@@ -10,7 +10,7 @@ class SandboxTool(BaseModel):
     image: str = Field(default="python:3.10-slim", description="샌드박스에서 사용할 기반 이미지")
     timeout_seconds: int = Field(default=30, description="스크립트 실행 타임아웃")
     
-    def get_executor(self) -> ContainerCodeExecutor:
+    def get_executor(self) -> Any:
         """
         배포 스크립트를 테스트할 컨테이너 실행기를 초기화하여 반환합니다.
         
@@ -21,6 +21,8 @@ class SandboxTool(BaseModel):
         # ContainerCodeExecutor는 run_code_snippet 등의 메서드를 통해
         # 코드 구문을 안전하게 컨테이너 안에서 실행하고 stdout/stderr를 반환합니다.
         
+        from google.adk.code_executors import ContainerCodeExecutor
+
         executor = ContainerCodeExecutor(
             image=self.image,
         )
