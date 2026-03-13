@@ -34,7 +34,7 @@ GWS CLI 구동을 위해서는 GCP(Google Cloud Platform) 프로젝트 내 OAuth
 
 3. **로그인 인증 (`gws auth login`)**
    - 클라이언트 설정(1 또는 2)이 준비된 후 터미널에서 아래 명령어를 실행합니다.
-   - `$ gws auth login --scopes https://www.googleapis.com/auth/chat.messages`
+   - `$ gws auth login --scopes https://www.googleapis.com/auth/chat.messages,https://www.googleapis.com/auth/chat.spaces,https://www.googleapis.com/auth/cloud-platform`
    - 브라우저에 표시되는 가이드에 따라 Google 계정 접근 권한 부여를 수락합니다.
    - ⚠️ 만약 403 에러(`Request had insufficient authentication scopes`)가 발생하거나 스코프 선택 화면에 Chat이 없다면, GCP 콘솔에서 **"Google Chat API"**가 활성화되어 있는지 확인해 주세요.
 
