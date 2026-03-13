@@ -44,52 +44,64 @@ class BookStackToolset(BaseTool):
         if scope_tag == "workspace" and not project_id:
             return "Error: Workspace scope requires a project_id."
             
-        book_name = ""
-        if scope_tag == "global":
-            book_name = "[Antigravity] Global Policy"
-        elif scope_tag == "workspace":
-            book_name = f"[Workspace] {project_id}"
+        book_slug = "antigravity-global-policy" if scope_tag == "global" else f"workspace-{project_id}"
             
         async with httpx.AsyncClient() as client:
             headers = self.get_headers()
             combined_markdown = []
             
-            for target in ["rules", "skills"]:
-                # 검색 API를 통해 특정 Book 내부의 rules/skills 페이지 검색
-                search_url = f"{self.api_url}/search"
-                params = {"query": f'"{target}" +book:"{book_name}" +type:page'}
+            try:
+                # 1. 대상 책(Book) ID 조회
+                books_url = f"{self.api_url}/books"
+                books_res = await client.get(books_url, headers=headers, params={"filter[slug]": book_slug})
+                books_res.raise_for_status()
+                books_data = books_res.json().get("data", [])
                 
-                try:
-                    res = await client.get(search_url, headers=headers, params=params)
-                    res.raise_for_status()
-                    res_json = res.json()
+                if not books_data:
+                    return f"Error: Book not found for slug '{book_slug}'"
+                
+                book_id = books_data[0]["id"]
+                
+                # 2. 책 상세 정보 조회 (하위 챕터 및 페이지 트리 구조 획득)
+                book_detail_url = f"{self.api_url}/books/{book_id}"
+                book_detail_res = await client.get(book_detail_url, headers=headers)
+                book_detail_res.raise_for_status()
+                
+                contents = book_detail_res.json().get("contents", [])
+                
+                # 3. rules, skills 챕터 탐색
+                for target in ["rules", "skills"]:
+                    chapter = next((c for c in contents if c.get("type") == "chapter" and c.get("slug") == target), None)
                     
-                    logger.info(f"====== [BookStack Search API] '{target}' in '{book_name}' ======\n{res_json}\n==================================================================")
-                    
-                    data = res_json.get("data", [])
-                    
-                    if not data:
-                        logger.warning(f"====== [BookStack API] No page found for '{target}' in '{book_name}' ======")
-                        combined_markdown.append(f"<!-- No {target} found in {book_name} -->")
+                    if not chapter:
+                        logger.warning(f"====== [BookStack API] No '{target}' chapter found in '{book_slug}' ======")
+                        combined_markdown.append(f"<!-- No {target} chapter found in {book_slug} -->")
                         continue
                         
-                    # 매칭되는 페이지의 id 추출
-                    page_id = data[0].get("id")
+                    combined_markdown.append(f"## {target.capitalize()} ({scope_tag.capitalize()})\n")
                     
-                    # 페이지 내용(markdown) 추출
-                    page_url = f"{self.api_url}/pages/{page_id}"
-                    page_res = await client.get(page_url, headers=headers)
-                    page_res.raise_for_status()
-                    
-                    md_content = page_res.json().get("markdown", "")
-                    logger.info(f"====== [BookStack API] Fetched '{target}' from '{book_name}' ======\n{md_content}\n=======================================================")
-                    
-                    combined_markdown.append(f"## {target.capitalize()} ({scope_tag.capitalize()})\n\n{md_content}")
-                    
-                except Exception as e:
-                    combined_markdown.append(f"<!-- Error connecting to BookStack API for {target}: {str(e)} -->")
-            
-            return "\n\n".join(combined_markdown)
+                    # 4. 챕터에 소속된 페이지들의 마크다운 내용을 긁어옴
+                    pages = chapter.get("pages", [])
+                    if not pages:
+                        combined_markdown.append(f"<!-- No pages in {target} chapter -->")
+                        continue
+                        
+                    for page_info in pages:
+                        page_id = page_info["id"]
+                        page_url = f"{self.api_url}/pages/{page_id}"
+                        page_res = await client.get(page_url, headers=headers)
+                        page_res.raise_for_status()
+                        
+                        md_content = page_res.json().get("markdown", "")
+                        combined_markdown.append(f"### {page_info.get('name')}\n\n{md_content}")
+                        
+                        logger.info(f"====== [BookStack API] Fetched Page '{page_info.get('name')}' in Chapter '{target}' ======\n{md_content}\n=======================================================")
+                
+                return "\n\n".join(combined_markdown)
+                
+            except Exception as e:
+                logger.error(f"====== [BookStack API] Error connecting for '{book_slug}': {str(e)} ======")
+                return f"Error connecting to BookStack API: {str(e)}"
 
     async def publish_sync_report(self, project_id: str, diff_md: str) -> str:
         """
