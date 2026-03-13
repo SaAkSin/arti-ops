@@ -1,5 +1,8 @@
 import argparse
 import asyncio
+import os
+import logging
+from dotenv import load_dotenv
 from textual.app import App, ComposeResult
 from textual.containers import Container, VerticalScroll
 from textual.widgets import Header, Footer, Label, Static
@@ -135,6 +138,20 @@ class ArtiOpsApp(App):
             self.status_bar.update("❌ Pipeline Failed.")
 
 def main():
+    # .env 환경 변수 로드 (명령어 진입점이므로 가장 먼저 실행)
+    load_dotenv()
+    
+    # 로그 디렉토리 보장 및 파일 로깅 설정 (TUI 화면 깨짐 방지 위해 파일로만 기록)
+    os.makedirs("logs", exist_ok=True)
+    logging.basicConfig(
+        filename="logs/arti-ops-tui.log",
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    
+    # Textual 내부 에러 로그 등도 파일에 남기도록 설정 가능
+    # os.environ["TEXTUAL_LOG"] = "logs/textual.log"
+
     parser = argparse.ArgumentParser(description="arti-ops: ADK AgentOps Platform CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
     
