@@ -6,7 +6,7 @@ Pure Google ADK(Python)의 내장 객체들을 적극 활용하여 시스템을 
 
 ```text
 [ Client Layer (Local PC) ]
-  ├── 🖥️ Textual TUI (`arti-ops`) : 명령어 입력 및 Diff 뷰어 렌더링
+  ├── 🖥️ Textual TUI (`arti-ops`) : Claude CLI 스타일의 마크다운 채팅(ChatBubble) 뷰어
   └── 📂 Target Workspace : 최종 산출물이 병합될 `.agents/` 디렉토리
 
 [ ADK Core Layer (Python) ]
@@ -19,7 +19,7 @@ Pure Google ADK(Python)의 내장 객체들을 적극 활용하여 시스템을 
 [ Integration Layer (ADK Tools) ]
   ├── 📚 BookStackToolset (RestApiTool) : BookStack API 통신 (Read/Write)
   ├── 💬 GwsChatTool (LongRunningFunctionTool) : HITL 승인 위한 gws CLI 구동 및 대기
-  └── 🐳 SandboxTool (ContainerCodeExecutor) : Docker 기반 안전 격리 실행 환경
+  └── 🐳 SandboxTool (ContainerCodeExecutor) : Docker 기반 안전 격리 실행 환경 (의존성 부족 시 Lazy Load 스킵 처리)
 
 ```
 
