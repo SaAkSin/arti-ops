@@ -2,29 +2,68 @@ import argparse
 import asyncio
 from textual.app import App, ComposeResult
 from textual.containers import Container, VerticalScroll
-from textual.widgets import Header, Footer, Log, Label, Static
+from textual.widgets import Header, Footer, Label, Static
+from rich.markdown import Markdown
+
+class ChatBubble(Static):
+    """실시간으로 Markdown 텍스트를 파싱하여 보여주는 채팅 블록"""
+    def __init__(self, role: str, initial_text: str=""):
+        super().__init__()
+        self.role = role
+        self._text = initial_text
+        self.content_widget = Static(Markdown(self._text), classes="chat_content")
+
+    def compose(self) -> ComposeResult:
+        if self.role.lower() == "system":
+            yield Label(f"⚙️ {self.role}", classes="chat_role system_role")
+        elif self.role.lower() == "user":
+            yield Label(f"👤 {self.role}", classes="chat_role user_role")
+        else:
+            yield Label(f"🤖 {self.role}", classes="chat_role ai_role")
+        yield self.content_widget
+
+    def append_text(self, text: str):
+        self._text += text
+        self.content_widget.update(Markdown(self._text))
 
 class ArtiOpsApp(App):
     """
     arti-ops TUI 애플리케이션
-    에이전트들의 진행 상황을 실시간 스트리밍으로 렌더링합니다.
+    Claude CLI 스타일의 모던한 마크다운 채팅 인터페이스를 제공합니다.
     """
     CSS = """
     Screen {
-        layout: vertical;
+        background: $surface;
     }
-    #main_container {
+    #chat_container {
         height: 1fr;
         padding: 1 2;
+        overflow-y: scroll;
     }
-    Log {
-        border: solid green;
-        height: 1fr;
+    ChatBubble {
+        margin-top: 1;
+        margin-bottom: 1;
+        background: $panel;
+        padding: 1 2;
+        border-left: thick $accent;
     }
-    .status_label {
-        padding: 1;
+    .chat_role {
         text-style: bold;
-        color: cyan;
+        margin-bottom: 1;
+    }
+    .system_role { color: $warning; }
+    .user_role { color: $text; }
+    .ai_role { color: $success; }
+    .chat_content {
+        margin-left: 2;
+    }
+    #status_bar {
+        dock: bottom;
+        height: 1;
+        padding: 0 1;
+        background: $accent;
+        color: $text;
+        text-style: bold;
     }
     """
     
@@ -36,46 +75,64 @@ class ArtiOpsApp(App):
     def __init__(self, target_project: str):
         super().__init__()
         self.target_project = target_project
-        self.status_label = Label(f"Target Project: {self.target_project}", classes="status_label")
-        self.log_view = Log(id="agent_log")
+        self.chat_container = VerticalScroll(id="chat_container")
+        self.status_bar = Label(f"🚀 Ready to sync: {self.target_project}", id="status_bar")
+        self.current_ai_bubble = None
         
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        with Container(id="main_container"):
-            yield self.status_label
-            yield self.log_view
-        yield Footer()
+        yield self.chat_container
+        yield self.status_bar
 
     async def on_mount(self) -> None:
-        self.title = "arti-ops v0.1.0 Platform"
+        self.title = "arti-ops v0.1.0"
         self.sub_title = "ADK Policy Sync Environment"
-        self.log_view.write_line("🚀 [System] Initializing Antigravity Agent Crew...")
         
-        # 여기서 파이프라인 비동기 실행 스레드/태스크를 예약해 스트리밍 이벤트를 받습니다.
-        asyncio.create_task(self.run_pipeline())
+        sys_bubble = ChatBubble(role="System", initial_text="최신 정책 융합 및 배포 파이프라인 엔진을 가동합니다...")
+        self.chat_container.mount(sys_bubble)
+        
+        # 시작 프롬프트를 User 입장에서 출력
+        prompt = f"Target Workspace: `{self.target_project}` 에 대해 L1, L2 룰을 융합하고 로컬에 배포할 준비를 하세요."
+        user_bubble = ChatBubble(role="User", initial_text=prompt)
+        self.chat_container.mount(user_bubble)
+        
+        asyncio.create_task(self.run_pipeline(prompt))
 
-    async def run_pipeline(self) -> None:
+    async def run_pipeline(self, prompt: str) -> None:
         from ..core.pipeline import PartiOpsPipeline
         try:
+            self.status_bar.update("⏳ Pipeline is running... Please wait.")
             pipeline = PartiOpsPipeline(target_project_id=self.target_project)
-            prompt = f"Target Workspace: {self.target_project} 에 대해 L1, L2 룰을 융합하고 로컬에 배포할 준비를 하세요."
             
             async for event in pipeline.run(command_prompt=prompt):
-                # Textual Log 위젯에 로그와 메세지 스트림 작성
-                # Event 객체의 타입(Content 유무)에 따라 메세지 포맷팅
                 text_output = ""
                 if getattr(event, "content", None) and getattr(event.content, "parts", None):
                     text_output = "".join([part.text for part in event.content.parts if part.text])
                 
                 if text_output:
-                     self.log_view.write(text_output)
+                    # 새로운 AI 응답 텍스트가 들어올 때
+                    if not self.current_ai_bubble:
+                        self.current_ai_bubble = ChatBubble(role="Agent Pipeline", initial_text="")
+                        self.chat_container.mount(self.current_ai_bubble)
+                    self.current_ai_bubble.append_text(text_output)
+                    self.chat_container.scroll_end(animate=False)
                 else:
-                     # 상태 전환 등 다른 시스템 이벤트 렌더링
-                     self.log_view.write_line(f"➤ [Event] {event.__class__.__name__}")
+                    # Content가 없는 상태 전환, System Event 등
+                    # Event 종류가 바뀔 때마다 버블을 새로 팝시키기 위해 None으로 초기화할 수도 있지만
+                    # 너무 잘게 쪼개지지 않도록 Event 클래스명만 System으로 살짝 출력
+                    event_name = event.__class__.__name__
+                    if event_name not in ("ModelCallEvent", "ToolCallEvent"): # 노이즈 방지
+                         sys_event = ChatBubble(role="System", initial_text=f"`{event_name}` 상태 진입")
+                         self.chat_container.mount(sys_event)
+                         self.chat_container.scroll_end(animate=False)
+                         self.current_ai_bubble = None # 다음 텍스트는 새로운 버블로
                      
-            self.log_view.write_line("\n✅ [System] Pipeline execution completed. You can quit (q) now.")
+            self.status_bar.update("✅ Done! You can exit by pressing 'q'.")
         except Exception as e:
-            self.log_view.write_line(f"❌ [Error] {str(e)}")
+            err_bubble = ChatBubble(role="System", initial_text=f"**Error Occurred:**\n```\n{str(e)}\n```")
+            self.chat_container.mount(err_bubble)
+            self.chat_container.scroll_end(animate=False)
+            self.status_bar.update("❌ Pipeline Failed.")
 
 def main():
     parser = argparse.ArgumentParser(description="arti-ops: ADK AgentOps Platform CLI")
