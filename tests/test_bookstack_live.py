@@ -28,7 +28,7 @@ async def test_live_fetch_global_policy(live_bookstack_tool):
 async def test_live_fetch_workspace_policy(live_bookstack_tool):
     """실제 통신을 통한 Workspace(L2) 정책 조회 테스트"""
     # 사용자가 준비 중인 임의의 테스트용 workspace id
-    project_id = "Project_Alpha"
+    project_id = "arti-ops"
     response = await live_bookstack_tool.fetch_policies(scope_tag="workspace", project_id=project_id)
     
     print(f"\n[Workspace L2 룰 응답 ({project_id})]:\n{response}\n")

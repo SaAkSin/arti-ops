@@ -42,39 +42,45 @@ class BookStackToolset(BaseTool):
         if scope_tag == "workspace" and not project_id:
             return "Error: Workspace scope requires a project_id."
             
-        search_query = ""
+        book_name = ""
         if scope_tag == "global":
-            search_query = "[Antigravity] Global Policy"
+            book_name = "[Antigravity] Global Policy"
         elif scope_tag == "workspace":
-            search_query = f"[Workspace] {project_id}"
+            book_name = f"[Workspace] {project_id}"
             
         async with httpx.AsyncClient() as client:
             headers = self.get_headers()
+            combined_markdown = []
             
-            # 검색 API를 통해 해당 이름을 가진 페이지 검색
-            search_url = f"{self.api_url}/search"
-            params = {"query": f'"{search_query}" +type:page'}
-            
-            try:
-                res = await client.get(search_url, headers=headers, params=params)
-                res.raise_for_status()
-                data = res.json().get("data", [])
+            for target in ["rules", "skills"]:
+                # 검색 API를 통해 특정 Book 내부의 rules/skills 페이지 검색
+                search_url = f"{self.api_url}/search"
+                params = {"query": f'"{target}" +book:"{book_name}" +type:page'}
                 
-                if not data:
-                    return f"No policies found for: {search_query}"
+                try:
+                    res = await client.get(search_url, headers=headers, params=params)
+                    res.raise_for_status()
+                    data = res.json().get("data", [])
                     
-                # 첫 번째 매칭되는 페이지의 id 추출
-                page_id = data[0].get("id")
-                
-                # 페이지 내용(markdown) 추출 API
-                page_url = f"{self.api_url}/pages/{page_id}"
-                page_res = await client.get(page_url, headers=headers)
-                page_res.raise_for_status()
-                
-                return page_res.json().get("markdown", "")
-                
-            except Exception as e:
-                return f"Error connecting to BookStack API: {str(e)}"
+                    if not data:
+                        combined_markdown.append(f"<!-- No {target} found in {book_name} -->")
+                        continue
+                        
+                    # 매칭되는 페이지의 id 추출
+                    page_id = data[0].get("id")
+                    
+                    # 페이지 내용(markdown) 추출
+                    page_url = f"{self.api_url}/pages/{page_id}"
+                    page_res = await client.get(page_url, headers=headers)
+                    page_res.raise_for_status()
+                    
+                    md_content = page_res.json().get("markdown", "")
+                    combined_markdown.append(f"## {target.capitalize()} ({scope_tag.capitalize()})\n\n{md_content}")
+                    
+                except Exception as e:
+                    combined_markdown.append(f"<!-- Error connecting to BookStack API for {target}: {str(e)} -->")
+            
+            return "\n\n".join(combined_markdown)
 
     async def publish_sync_report(self, project_id: str, diff_md: str) -> str:
         """

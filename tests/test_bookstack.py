@@ -14,20 +14,29 @@ def bookstack_tool(monkeypatch):
 @patch("httpx.AsyncClient.get")
 async def test_fetch_policies_global(mock_get, bookstack_tool):
     """Global (L1) 정책 조회 테스트"""
-    mock_res = MagicMock()
-    mock_res.json.return_value = {"markdown": "Global Rules (L1)\n1. Never use root access."}
-    mock_res.status_code = 200
+    mock_res_rules = MagicMock()
+    mock_res_rules.json.return_value = {"markdown": "Global Rules (L1)\n1. Never use root access."}
+    mock_res_rules.status_code = 200
     
-    # search api response mock
-    mock_search = MagicMock()
-    mock_search.json.return_value = {"data": [{"id": 1}]}
-    mock_search.status_code = 200
+    mock_search_rules = MagicMock()
+    mock_search_rules.json.return_value = {"data": [{"id": 1}]}
+    mock_search_rules.status_code = 200
     
-    mock_get.side_effect = [mock_search, mock_res]
+    # skills api response mock
+    mock_res_skills = MagicMock()
+    mock_res_skills.json.return_value = {"markdown": "Global Skills (L1)\n1. Know Linux."}
+    mock_res_skills.status_code = 200
+    
+    mock_search_skills = MagicMock()
+    mock_search_skills.json.return_value = {"data": [{"id": 2}]}
+    mock_search_skills.status_code = 200
+    
+    # get 4 calls: search rules, rules page, search skills, skills page
+    mock_get.side_effect = [mock_search_rules, mock_res_rules, mock_search_skills, mock_res_skills]
 
     response = await bookstack_tool.fetch_policies(scope_tag="global")
     assert "Global Rules (L1)" in response
-    assert "access" in response
+    assert "Global Skills (L1)" in response
 
 @pytest.mark.asyncio
 @patch("httpx.AsyncClient.get")
@@ -35,19 +44,28 @@ async def test_fetch_policies_workspace_success(mock_get, bookstack_tool):
     """Workspace (L2) 정상 조회 테스트"""
     project_id = "Project_Alpha"
     
-    mock_res = MagicMock()
-    mock_res.json.return_value = {"markdown": f"Workspace {project_id} Rules\n1. Use PostgreSQL"}
-    mock_res.status_code = 200
+    mock_res_rules = MagicMock()
+    mock_res_rules.json.return_value = {"markdown": f"Workspace {project_id} Rules\n1. Use PostgreSQL"}
+    mock_res_rules.status_code = 200
     
-    mock_search = MagicMock()
-    mock_search.json.return_value = {"data": [{"id": 2}]}
-    mock_search.status_code = 200
+    mock_search_rules = MagicMock()
+    mock_search_rules.json.return_value = {"data": [{"id": 3}]}
+    mock_search_rules.status_code = 200
     
-    mock_get.side_effect = [mock_search, mock_res]
+    mock_res_skills = MagicMock()
+    mock_res_skills.json.return_value = {"markdown": f"Workspace {project_id} Skills\n1. Python Async"}
+    mock_res_skills.status_code = 200
+    
+    mock_search_skills = MagicMock()
+    mock_search_skills.json.return_value = {"data": [{"id": 4}]}
+    mock_search_skills.status_code = 200
+    
+    mock_get.side_effect = [mock_search_rules, mock_res_rules, mock_search_skills, mock_res_skills]
 
     response = await bookstack_tool.fetch_policies(scope_tag="workspace", project_id=project_id)
     assert f"Workspace {project_id} Rules" in response
     assert "PostgreSQL" in response
+    assert "Python Async" in response
 
 @pytest.mark.asyncio
 async def test_fetch_policies_workspace_missing_id(bookstack_tool):
