@@ -112,20 +112,22 @@ class ArtiOpsApp(App):
                 if getattr(event, "content", None) and getattr(event.content, "parts", None):
                     text_output = "".join([part.text for part in event.content.parts if part.text])
                 
+                agent_name = getattr(event, "author", "Pipeline")
+                # author 이름이 user이면 TUI에선 이미 프롬프트를 띄웠거나 System 처리하므로 패스하거나 분기
+                role_title = f"Agent ({agent_name})" if agent_name and agent_name.lower() != "user" else "Agent Pipeline"
+
                 if text_output:
-                    # 새로운 AI 응답 텍스트가 들어올 때
-                    if not self.current_ai_bubble:
-                        self.current_ai_bubble = ChatBubble(role="Agent Pipeline", initial_text="")
+                    # 새로운 AI 응답 텍스트가 들어오거나 에이전트가 교체되었을 때
+                    if not self.current_ai_bubble or self.current_ai_bubble.role != role_title:
+                        self.current_ai_bubble = ChatBubble(role=role_title, initial_text="")
                         self.chat_container.mount(self.current_ai_bubble)
                     self.current_ai_bubble.append_text(text_output)
                     self.chat_container.scroll_end(animate=False)
                 else:
                     # Content가 없는 상태 전환, System Event 등
-                    # Event 종류가 바뀔 때마다 버블을 새로 팝시키기 위해 None으로 초기화할 수도 있지만
-                    # 너무 잘게 쪼개지지 않도록 Event 클래스명만 System으로 살짝 출력
-                    event_name = event.__class__.__name__
+                    event_name = getattr(event, "__class__", type(event)).__name__
                     if event_name not in ("ModelCallEvent", "ToolCallEvent"): # 노이즈 방지
-                         sys_event = ChatBubble(role="System", initial_text=f"`{event_name}` 상태 진입")
+                         sys_event = ChatBubble(role="System", initial_text=f"`{event_name}` 상태 진입 (Author: {agent_name})")
                          self.chat_container.mount(sys_event)
                          self.chat_container.scroll_end(animate=False)
                          self.current_ai_bubble = None # 다음 텍스트는 새로운 버블로
