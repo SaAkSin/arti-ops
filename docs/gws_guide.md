@@ -14,12 +14,47 @@
   sudo mv gws /usr/local/bin/
   ```
 
-### 1-B. 연동 및 인증 (1회성)
+### 1-B. gcloud CLI 설치 및 애플리케이션 기본 인증 (ADC) 설정
+`gws` 도구가 Google API에 정상적으로 접근하고 `setup` 명령어를 수행하려면 로컬 환경에 `gcloud` CLI 툴이 필요합니다.
+
+**1. gcloud 설치 (Rocky Linux 9 환경 예시)**
+서버 환경에서 세팅이 필요하신 경우, Google Cloud 저장소를 추가한 뒤 `dnf` 패키지 관리자를 통해 설치해 주시면 됩니다.
+```bash
+sudo tee -a /etc/yum.repos.d/google-cloud-cli.repo << EOM
+[google-cloud-cli]
+name=Google Cloud CLI
+baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOM
+
+sudo dnf install google-cloud-cli
+```
+
+**2. 초기화 및 로그인 (필수 과정)**
+설치가 완료되었다면, 터미널에서 다음 두 가지 명령어를 순서대로 실행하여 계정을 연결하고 프로젝트를 세팅해 주셔야 합니다.
+
+* **1단계: `gcloud` 초기화**
+  ```bash
+  gcloud init
+  ```
+  이 명령어를 실행하면 브라우저가 열리며 Google 계정 로그인을 요청합니다. 로그인 후, 앞서 Google Cloud Console에서 생성해 두셨던 프로젝트를 선택해 주시면 됩니다.
+
+* **2단계: 애플리케이션 기본 인증(ADC) 설정**
+  `gws`와 같은 외부 CLI 도구들이 Google API에 정상적으로 접근할 수 있도록 권한을 부여하는 가장 중요한 단계입니다.
+  ```bash
+  gcloud auth application-default login
+  ```
+  마찬가지로 브라우저 창이 열리며 권한 허용 동의를 묻습니다. 이 과정을 마치면 시스템 내부에 자격 증명(Credentials)이 안전하게 저장되며, 이후 `gws` 도구가 이를 자동으로 인식하여 사용할 수 있게 됩니다.
+
+### 1-C. GWS CLI 연동 및 인증 (1회성)
 GWS CLI 구동을 위해서는 GCP(Google Cloud Platform) 프로젝트 내 OAuth 동의 구성과 데스크톱 앱용 OAuth 클라이언트 ID가 필요합니다.
 
 1. **OAuth 클라이언트 구성 (`gws auth setup`)**
    - 구글 클라우드 콘솔에 로그인할 수 있는 계정으로 터미널에서 `gws auth setup` 명령어를 실행하여 GCP 프로젝트를 할당하고 OAuth 클라이언트를 설정합니다.
-   - ⚠️ **주의**: 위 명령은 로컬 호스트에 `gcloud` CLI 툴이 설치되어 있어야 동작합니다. (`gcloud CLI not found` 에러 발생 시 아래 수동 발급 방법을 사용하세요.)
+   - ⚠️ **주의**: 위 명령은 로컬 호스트에 `gcloud` CLI 툴이 앞서 설치되어 있어야 동작합니다. (`gcloud CLI not found` 에러 발생 시 아래 수동 발급 방법을 사용하세요.)
 
 2. **수동 발급 옵션 (gcloud가 없는 경우 추천)**
    - [Google Cloud Console - API 및 서비스 > 사용자 인증 정보](https://console.cloud.google.com/apis/credentials) 페이지에 접속합니다.
