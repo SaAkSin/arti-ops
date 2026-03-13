@@ -19,11 +19,19 @@ GWS CLI 구동을 위해서는 GCP(Google Cloud Platform) 프로젝트 내 OAuth
 
 1. **OAuth 클라이언트 구성 (`gws auth setup`)**
    - 구글 클라우드 콘솔에 로그인할 수 있는 계정으로 터미널에서 `gws auth setup` 명령어를 실행하여 GCP 프로젝트를 할당하고 OAuth 클라이언트를 설정합니다.
-   - (또는 기존 GCP에서 다운로드 받은 `client_secret.json` 파일을 `~/.config/gws/client_secret.json` 에 직접 배치하셔도 무방합니다.)
-2. **로그인 인증 (`gws auth login`)**
-   - 클라이언트 설정이 준비된 후 `gws auth login` 명령어를 실행합니다.
+   - ⚠️ **주의**: 위 명령은 로컬 호스트에 `gcloud` CLI 툴이 설치되어 있어야 동작합니다. (`gcloud CLI not found` 에러 발생 시 아래 수동 발급 방법을 사용하세요.)
+
+2. **수동 발급 옵션 (gcloud가 없는 경우 추천)**
+   - [Google Cloud Console - API 및 서비스 > 사용자 인증 정보](https://console.cloud.google.com/apis/credentials) 페이지에 접속합니다.
+   - 본인이 소유한 프로젝트에서 **"사용자 인증 정보 만들기" > "OAuth 클라이언트 ID"**를 선택합니다.
+   - 애플리케이션 유형을 **"데스크톱 앱(Desktop app)"**으로 선택하고 생성합니다.
+   - 생성된 클라이언트의 JSON 파일을 다운로드 받아 이름을 `client_secret.json`으로 변경한 후, 터미널 환경의 `~/.config/gws/client_secret.json` 경로에 배치합니다.
+
+3. **로그인 인증 (`gws auth login`)**
+   - 클라이언트 설정(1 또는 2)이 준비된 후 `gws auth login` 명령어를 실행합니다.
    - 브라우저에 표시되는 가이드에 따라 Google 계정 접근 권한 부여를 수락합니다.
-3. 터미널 인증이 완료되면 정상적으로 gws명령어를 사용할 준비가 끝납니다.
+
+4. 터미널 인증이 완료되면 정상적으로 gws 명령어를 사용할 준비가 끝납니다.
 
 ## 2. 프로젝트 환경변수 설정
 메시지를 발송할 대상 Space ID를 `arti-ops` 프로젝트 루트의 `.env` 파일에 다음과 같이 추가합니다.
