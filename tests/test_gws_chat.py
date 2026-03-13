@@ -10,11 +10,11 @@ async def test_gws_chat_tool_no_space_id():
     """
     with patch.dict(os.environ, {"GWS_SPACE_ID": ""}):
         tool = GwsChatTool()
-    
-    with patch("asyncio.create_subprocess_exec") as mock_exec:
-        await tool.request_approval("TEST-PROJ", "diff_content", "test_reason")
-        # gws_space_id가 없으므로 subprocess가 호출되지 않아야 함
-        mock_exec.assert_not_called()
+        
+        with patch("asyncio.create_subprocess_exec") as mock_exec:
+            await tool.request_approval("TEST-PROJ", "diff_content", "test_reason")
+            # gws_space_id가 없으므로 subprocess가 호출되지 않아야 함
+            mock_exec.assert_not_called()
 
 @pytest.mark.asyncio
 @patch("arti_ops.tools.gws_chat.asyncio.create_subprocess_exec")
@@ -41,10 +41,10 @@ async def test_gws_chat_tool_subprocess_call(mock_create_subprocess_exec):
         
         assert args[0] == "gws"
         assert args[1] == "chat"
-        assert args[2] == "send"
+        assert args[2] == "+send"
         assert "--space" in args
         assert "spaces/TEST_SPACE" in args
-        assert "--message" in args
+        assert "--text" in args
         
         # run() 메서드 연계 테스트
         mock_create_subprocess_exec.reset_mock()

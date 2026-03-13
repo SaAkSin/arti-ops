@@ -53,7 +53,7 @@ GWS_SPACE_ID="spaces/XXXXXXX"
 *   `CriticalVerifier` 에이전트가 "사람의 검토가 필요하다"고 판단하면, `run` 메서드를 호출합니다.
 *   에이전트가 해당 툴을 실행하는 즉시 메인 `Runner` 파이프라인의 **이벤트 스트림은 `Pause`(일시 정지) 상태로 전환**됩니다(Async Yield).
 *   파이썬 내부에서 `subprocess`나 비동기 쉘 코드를 통해 프로젝트 종속 인증 옵션을 포함한 발송 명령을 실행합니다.
-    - 예시: `gws chat send --space "$GWS_SPACE_ID" --message "..."`
+    - 예시: `gws chat +send --space "$GWS_SPACE_ID" --text "..."`
 
 ## 4. 백오피스(콜백)를 통한 Resume(재개) 처리 방법
 현재 `arti-ops` TUI/CLI 버전에서는 승인/거절 로직이 백엔드 REST API가 아닌 터미널 세션 내부에서 제어되거나, 별도의 API Gateway를 거쳐 콜백 주입(Callback Injection)으로 풀리게 진화될 예정입니다. 
