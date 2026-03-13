@@ -1,7 +1,10 @@
 import os
 import httpx
+import logging
 from typing import Optional, Dict, Any
 from google.adk.tools import BaseTool
+
+logger = logging.getLogger(__name__)
 from pydantic import ConfigDict, Field
 
 class BookStackToolset(BaseTool):
@@ -59,9 +62,14 @@ class BookStackToolset(BaseTool):
                 try:
                     res = await client.get(search_url, headers=headers, params=params)
                     res.raise_for_status()
-                    data = res.json().get("data", [])
+                    res_json = res.json()
+                    
+                    logger.info(f"====== [BookStack Search API] '{target}' in '{book_name}' ======\n{res_json}\n==================================================================")
+                    
+                    data = res_json.get("data", [])
                     
                     if not data:
+                        logger.warning(f"====== [BookStack API] No page found for '{target}' in '{book_name}' ======")
                         combined_markdown.append(f"<!-- No {target} found in {book_name} -->")
                         continue
                         
@@ -74,6 +82,8 @@ class BookStackToolset(BaseTool):
                     page_res.raise_for_status()
                     
                     md_content = page_res.json().get("markdown", "")
+                    logger.info(f"====== [BookStack API] Fetched '{target}' from '{book_name}' ======\n{md_content}\n=======================================================")
+                    
                     combined_markdown.append(f"## {target.capitalize()} ({scope_tag.capitalize()})\n\n{md_content}")
                     
                 except Exception as e:
