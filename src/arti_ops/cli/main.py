@@ -1,4 +1,4 @@
-from textual import events
+from textual import on, events
 import argparse
 import asyncio
 import os
@@ -6,100 +6,114 @@ import logging
 from itertools import cycle
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
-from textual.containers import VerticalScroll
-from textual.widgets import Header, Label, Static, Collapsible
+from textual.containers import VerticalScroll, Container
+from textual.widgets import Header, Footer, Label, Static, Collapsible
 from rich.markdown import Markdown
 
-# 리눅스/macOS 터미널 모두에서 호환되는 점자 스피너 프레임
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
-class ChatBubble(Collapsible):
-    """UI 렉을 원천 차단하기 위해 텍스트 생성 중에는 접어두고 스피너만 보여주는 스마트 블록"""
+class AgentBlock(Container):
+    """
+    [SSH 최적화 블록]
+    1. DOM 격리: 무거운 Collapsible을 건드리지 않고 가벼운 Label만 갱신하여 렉 원천 차단.
+    2. 지연 렌더링(Lazy Loading): 마크다운 파싱은 사용자가 아코디언을 클릭해 열 때 단 1회만 수행.
+    """
     def __init__(self, role: str, initial_text: str=""):
+        super().__init__()
         self.role_name = role
         self.icon = "⚙️" if "system" in role.lower() else "👤" if "user" in role.lower() else "🤖"
-        
-        # 렌더링 부하를 막기 위해 생성 즉시 아코디언을 닫아둠(collapsed=True)
-        super().__init__(title=f"{self.icon} [{self.role_name}] 준비 중...", collapsed=True)
-        
         self._full_text = initial_text
-        self.content_widget = Static(Markdown(""), classes="chat_content")
-        
-        self._spinner = cycle(SPINNER_FRAMES)
-        self._anim_timer = None
         self._is_generating = True
+        self._is_rendered = False
+        self._spinner = cycle(SPINNER_FRAMES)
+        
+        # 지속적으로 업데이트될 가벼운 라벨 위젯 (화면 Reflow 방지)
+        self.header_label = Label(f"{next(self._spinner)} {self.icon} [{self.role_name}] 작업 준비 중...", classes="header_label")
+        
+        # 렌더링 부하를 없애기 위해 초기엔 빈 텍스트로 생성
+        self.content_widget = Static("", classes="chat_content")
+        self.collapsible = Collapsible(self.content_widget, title="👉 상세 로그 펼치기 (클릭 또는 Enter)", collapsed=True)
 
     def compose(self) -> ComposeResult:
-        yield self.content_widget
+        yield self.header_label
+        yield self.collapsible
 
     def on_mount(self) -> None:
-        # 본문 렌더링 대신, 타이틀의 스피너만 0.1초마다 돌려 CPU 및 SSH 대역폭 소모 최소화
-        self._anim_timer = self.set_interval(0.1, self._animate_spinner)
+        # 애니메이션 타이머 등록 (0.15초)
+        self.anim_timer = self.set_interval(0.15, self._animate_spinner)
+        # 생성 중에는 불필요한 UI 조작을 막기 위해 아코디언 자체를 숨김
+        self.collapsible.display = False 
 
     def _animate_spinner(self):
         if self._is_generating:
             frame = next(self._spinner)
             bytes_len = len(self._full_text.encode('utf-8'))
             if bytes_len > 0:
-                self.title = f"{frame} {self.icon} [{self.role_name}] 응답 생성 중... ({bytes_len} Bytes)"
+                self.header_label.update(f"[bold cyan]{frame} {self.icon} [{self.role_name}] 텍스트 생성 중... ({bytes_len} Bytes)[/bold cyan]")
             else:
-                self.title = f"{frame} {self.icon} [{self.role_name}] 생각 중..."
+                self.header_label.update(f"[bold cyan]{frame} {self.icon} [{self.role_name}] 에이전트 초기화 중...[/bold cyan]")
 
     def append_text(self, text: str):
-        # 화면을 다시 그리지 않고 텍스트는 메모리 버퍼에만 조용히 누적
+        # 화면 조작 없이 문자열 버퍼에만 조용히 누적
         self._full_text += text
 
     def _get_summary(self) -> str:
-        """마크다운 문법을 제외한 핵심 첫 문장을 요약문으로 추출"""
+        """출력된 내용 중 의미 있는 첫 문장 추출"""
         lines = [line.strip() for line in self._full_text.splitlines() 
                  if line.strip() and not line.strip().startswith("```") and not line.strip().startswith("#")]
         if lines:
             first_line = lines[0]
-            return first_line[:45] + "..." if len(first_line) > 45 else first_line
+            return first_line[:55] + "..." if len(first_line) > 55 else first_line
         return "완료 (내용 없음)"
 
     def mark_complete(self):
-        """에이전트 턴 종료 시 애니메이션 중지 및 단 1회만 마크다운 렌더링 수행"""
-        if not self._is_generating:
+        """에이전트 턴 종료 시 애니메이션 중지 및 요약문 노출"""
+        if not self._is_generating: 
             return
             
         self._is_generating = False
-        if self._anim_timer:
-            self._anim_timer.pause()
+        if hasattr(self, 'anim_timer'):
+            self.anim_timer.pause()
             
-        # SSH 터미널 화면이 덜컹거리지 않도록 단 한 번만 렌더링
-        if self._full_text.strip():
-            self.content_widget.update(Markdown(self._full_text))
-            summary = self._get_summary()
-        else:
-            self.content_widget.update(Markdown("*출력된 내용이 없습니다.*"))
-            summary = "상태 업데이트 완료"
-            
-        # 요약 결과를 제목에 띄우고 계속 닫아둠 (클릭하면 펼쳐짐)
-        self.title = f"✅ {self.icon} [{self.role_name}] 요약: {summary}"
-        self.collapsed = True
+        summary = self._get_summary() if self._full_text.strip() else "출력 없음"
         
-        # 스크롤 최하단 유지
+        # 상태를 고정된 요약 텍스트로 변환
+        self.header_label.update(f"[bold green]✅ {self.icon} [{self.role_name}] 요약: {summary}[/bold green]")
+        
+        if self._full_text.strip():
+            self.collapsible.display = True # 이제 클릭하여 펼칠 수 있도록 노출
+            
         if self.app:
             try:
                 self.app.query_one("#chat_container", VerticalScroll).scroll_end(animate=True)
             except Exception:
                 pass
 
+    @on(Collapsible.Toggled)
+    def render_markdown_lazy(self, event: Collapsible.Toggled) -> None:
+        """사용자가 아코디언을 열었을 때 비로소 마크다운 렌더링 수행 (Lazy Loading)"""
+        if not event.collapsible.collapsed and not self._is_rendered:
+            self.content_widget.update(Markdown(self._full_text))
+            self._is_rendered = True
+            self.app.query_one("#chat_container", VerticalScroll).scroll_end(animate=True)
+
+
 class ArtiOpsApp(App):
     CSS = """
     Screen { background: $surface; }
     #chat_container { height: 1fr; padding: 1 2; overflow-y: scroll; }
-    ChatBubble { margin-top: 1; margin-bottom: 1; background: $panel; border-left: thick $accent; }
+    AgentBlock { margin-top: 1; margin-bottom: 1; background: $panel; border-left: thick $accent; padding: 1 2; }
+    .header_label { margin-bottom: 1; }
+    Collapsible { border-top: solid $surface; padding-top: 1; }
     .chat_content { margin-left: 2; padding-top: 1; padding-bottom: 1; }
     #status_bar { dock: bottom; height: 1; padding: 0 1; background: $accent; color: $text; text-style: bold; }
     """
     
+    # 하단 Footer에 단축키 명시 (리눅스 터미널 시인성 향상 및 포커스 이탈 대비)
     BINDINGS = [
-        ("q", "quit", "Quit"),
-        ("ctrl+c", "quit", "Quit"),
-        ("y", "approve", "Approve (HITL)"),
-        ("n", "reject", "Reject (HITL)"),
+        ("q", "quit", "종료(Q)"),
+        ("y", "approve", "배포 승인(Y)"),
+        ("n", "reject", "승인 반려(N)"),
     ]
 
     def __init__(self, target_project: str):
@@ -116,13 +130,14 @@ class ArtiOpsApp(App):
         yield Header(show_clock=True)
         yield self.chat_container
         yield self.status_bar
+        yield Footer() # 사용자 시인성 확보를 위한 푸터 추가
 
     async def on_mount(self) -> None:
-        self.title = "arti-ops v0.1.5"
-        self.sub_title = "Cross-Platform AgentOps (macOS/Linux)"
+        self.title = "arti-ops v0.1.7"
+        self.sub_title = "Cross-Platform AgentOps (macOS/Linux) - Lazy Render"
         
-        sys_bubble = ChatBubble(role="System", initial_text="최신 정책 융합 및 배포 파이프라인 엔진을 가동합니다...")
-        await self.chat_container.mount(sys_bubble) # 🚨 await 필수
+        sys_bubble = AgentBlock(role="System", initial_text="최신 정책 융합 및 배포 파이프라인 엔진을 가동합니다...")
+        await self.chat_container.mount(sys_bubble)
         sys_bubble.mark_complete()
         
         prompt = f"Target Workspace: `{self.target_project}` 에 대해 L1, L2 룰을 융합하고 배포를 시작합니다."
@@ -162,21 +177,20 @@ class ArtiOpsApp(App):
                     is_paused = True
 
                 if is_paused:
-                    self.status_bar.update("🔔 [HITL 대기] GWS 승인 요청됨: 진행 [Y], 반려 [N] 입력")
+                    self.status_bar.update("🔔 [HITL 대기] GWS 승인 요청됨: 하단 단축키를 눌러 승인(Y) 또는 반려(N)를 진행하세요.")
                     self.waiting_for_approval = True
+                    # 승인 대기 상태일 때는 내용을 즉시 검토할 수 있도록 현재 버블을 강제로 엽니다.
+                    if self.current_ai_bubble and self.current_ai_bubble.collapsible.display:
+                        self.current_ai_bubble.collapsible.collapsed = False
                     continue
 
                 if text_output:
+                    # 새로운 역할(Agent)로 스위치될 때만 새로운 블록 마운트
                     if not self.current_ai_bubble or getattr(self.current_ai_bubble, 'role_name', None) != role_title:
-                        
-                        # 🚨 비동기 DOM 조작 (await 추가)
                         if self.current_ai_bubble:
-                            if not self.current_ai_bubble._full_text.strip():
-                                await self.current_ai_bubble.remove()
-                            else:
-                                self.current_ai_bubble.mark_complete()
+                            self.current_ai_bubble.mark_complete()
                                 
-                        self.current_ai_bubble = ChatBubble(role=role_title, initial_text="")
+                        self.current_ai_bubble = AgentBlock(role=role_title, initial_text="")
                         await self.chat_container.mount(self.current_ai_bubble)
                         
                     self.current_ai_bubble.append_text(text_output)
@@ -188,9 +202,12 @@ class ArtiOpsApp(App):
                 self.status_bar.update("✅ 배포 완료! [Q]를 눌러 종료하세요.")
                 
         except Exception as e:
-            err_bubble = ChatBubble(role="System_Error", initial_text=f"**Error Occurred:**\n```\n{str(e)}\n```")
-            err_bubble.mark_complete()
+            err_bubble = AgentBlock(role="System_Error", initial_text=f"**Error Occurred:**\n```\n{str(e)}\n```")
             await self.chat_container.mount(err_bubble)
+            err_bubble.mark_complete()
+            # 에러는 강제로 펼쳐서 보여줌
+            if err_bubble.collapsible.display:
+                err_bubble.collapsible.collapsed = False 
             self.chat_container.scroll_end(animate=False)
             self.status_bar.update("❌ Pipeline Failed.")
 

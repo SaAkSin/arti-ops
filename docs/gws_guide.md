@@ -6,7 +6,10 @@
 `arti-ops` 내부에서 직접 gws를 설치하거나 관리하지 않습니다. **사전 준비된 로컬 OS 환경**에서 인증이 완료되어 있어야 워크플로우 통과가 가능합니다.
 
 ### 1-A. 설치 방법
-* MacOS (Homebrew): `brew install gws`
+* MacOS (Homebrew):
+  ```bash
+  npm install -g @googleworkspace/cli
+  ```
 * Linux (Binary):
   ```bash
   curl -Lo gws https://github.com/kimtree/gws/releases/latest/download/gws_linux_amd64
