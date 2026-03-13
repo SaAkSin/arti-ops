@@ -9,13 +9,15 @@ class GwsChatTool(LongRunningFunctionTool):
     gws CLI를 통해 배포 전 파일 변경 사항이나 충돌 사항을 알리고,
     PM/Manager의 승인(Resume)이 있을 때까지 ADK 파이프라인 엔진을 대기(Pause)시키는 HITL 툴.
     """
-    gws_space_id: str = Field(
-        description="메시지를 보낼 GWS Chat 스페이스 아이디 (예: spaces/XXXXX)",
-        default_factory=lambda: os.getenv("GWS_SPACE_ID", "")
-    )
-    
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
+    def __init__(self, **data):
+        super().__init__(func=self.run, **data)
+        
+    @property
+    def gws_space_id(self) -> str:
+        return os.getenv("GWS_SPACE_ID", "")
+
     async def request_approval(self, project_id: str, diff_md: str, conflict_reason: str) -> None:
         """
         gws CLI 쉘 명령어로 메시지를 전송합니다.
