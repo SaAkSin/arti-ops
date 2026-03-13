@@ -63,6 +63,10 @@ Mocking을 거치지 않고, 로컬 시스템의 `.env`에 정의된 `BOOKSTACK_
 BookStack 및 로컬에서 수집된 컨텍스트(L1, L2, L3)를 기반으로 최종 배포용 파이썬 스크립트를 작성하는 `SkillArchitect` 에이전트에 대한 검증입니다. 
 단위 테스트는 모델 할당(`GEMINI_MODEL_PRO`) 및 Pydantic 인스턴스 초기화 여부를 확인하며, `_live` 통합 테스트는 `venv` 환경변수에 기반하여 실제 Gemini-Pro 모델과 통신, 주어진 룰 제약 조건들(예: snake_case, logging 모듈 강제 등)을 지킨 온전한 ````python` 스크립트가 반환되는지 Stream 파싱 결과를 확인합니다.
 
+### 4.5. `test_verifier.py` & `test_verifier_live.py`
+Architect 에이전트가 만든 산출물을 Red-Team 관점에서 들여다보는 `CriticalVerifier` 에이전트에 대한 검증입니다. 
+초기 생성 단위 테스트를 비롯하여, 라이브 통합 테스트(`_live.py`)에서는 외부 API 호출 금지나 `snake_case` 무시와 같은 의도된 위반 사항 코드를 주입했을 때, 모델이 `urllib` 호출의 위험도(High Risk)를 정확히 지적하고 반려 사유를 리포트하는지 검증합니다.
+
 ## 5. 추가 테스트 작성 (진행중인 사항)
 
-향후 개발될 Agent 2종(`Verifier`, `Executor`)에 대해서도 프롬프트 인스트럭션 추론 결과 및 State 머신의 변화를 추적(Mocking LLM)하는 단위 테스트가 지속 추가될 예정입니다.
+향후 개발될 `Executor` 에이전트에 대해서도 프롬프트 인스트럭션 추론 결과 및 State 머신의 변화를 추적(Mocking LLM)하는 단위 테스트가 지속 추가될 예정입니다.
