@@ -6,7 +6,7 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
-from prompt_toolkit.widgets import Frame
+from prompt_toolkit.widgets import Frame, TextArea
 
 async def run_list_viewer(plan_lookup, base_dir):
     """
@@ -70,6 +70,7 @@ async def run_list_viewer(plan_lookup, base_dir):
 
     # 상태 관리
     current_index = 0
+    current_focus = "left"  # "left" or "right"
     
     # 처음에 포커스 가능한 아이템 찾기
     for i, (_, path) in enumerate(items):
@@ -79,7 +80,12 @@ async def run_list_viewer(plan_lookup, base_dir):
 
     # UI 컴포넌트
     left_text_control = FormattedTextControl()
-    right_text_control = FormattedTextControl(text="미리보기 화면입니다.\n좌측 목록에서 'Space'를 눌러 파일 내용을 확인하세요.")
+    right_text_area = TextArea(
+        text="미리보기 화면입니다.\n좌측 목록에서 'Space'를 눌러 파일 내용을 확인하세요.",
+        read_only=True,
+        scrollbar=True,
+        wrap_lines=True,
+    )
     
     def update_left_pane():
         formatted_text = []
@@ -95,18 +101,18 @@ async def run_list_viewer(plan_lookup, base_dir):
     update_left_pane()
     
     left_window = Window(content=left_text_control, wrap_lines=False, width=40)
-    right_window = Window(content=right_text_control, wrap_lines=True)
 
     body = VSplit([
-        Frame(left_window, title="로컬 파일 목록"),
-        Frame(right_window, title="파일 미리보기")
+        Frame(left_window, title=lambda: "▶ 로컬 파일 목록 (포커스됨)" if current_focus == "left" else "로컬 파일 목록"),
+        Frame(right_text_area, title=lambda: "▶ 파일 미리보기 (포커스됨)" if current_focus == "right" else "파일 미리보기")
     ])
 
+    toolbar_text_control = FormattedTextControl(
+        text=" [↑/↓: 이동 | Space: 미리보기 | Tab: 뷰 전환 | q / Esc / Enter: 닫기]"
+    )
     toolbar = Window(
         height=1,
-        content=FormattedTextControl(
-            text=" [↑/↓: 이동 | Space: 미리보기 | q / Esc / Enter: 닫기]"
-        ),
+        content=toolbar_text_control,
         style="class:bottom-toolbar"
     )
 
@@ -121,27 +127,53 @@ async def run_list_viewer(plan_lookup, base_dir):
     def _(event):
         event.app.exit()
 
+    @kb.add("tab")
+    def _(event):
+        nonlocal current_focus
+        if current_focus == "left":
+            current_focus = "right"
+            toolbar_text_control.text = " [↑/↓: 텍스트 스크롤 | Tab: 뷰 전환 | q / Esc / Enter: 닫기]"
+        else:
+            current_focus = "left"
+            toolbar_text_control.text = " [↑/↓: 이동 | Space: 미리보기 | Tab: 뷰 전환 | q / Esc / Enter: 닫기]"
+
     @kb.add("up")
     def _(event):
         nonlocal current_index
-        next_idx = current_index - 1
-        while next_idx >= 0:
-            if items[next_idx][1]: # path가 있으면 포커스 가능
-                current_index = next_idx
-                update_left_pane()
-                break
-            next_idx -= 1
+        if current_focus == "left":
+            next_idx = current_index - 1
+            while next_idx >= 0:
+                if items[next_idx][1]: # path가 있으면 포커스 가능
+                    current_index = next_idx
+                    update_left_pane()
+                    break
+                next_idx -= 1
+        elif current_focus == "right":
+            right_text_area.buffer.cursor_up(count=event.arg)
 
     @kb.add("down")
     def _(event):
         nonlocal current_index
-        next_idx = current_index + 1
-        while next_idx < len(items):
-            if items[next_idx][1]:
-                current_index = next_idx
-                update_left_pane()
-                break
-            next_idx += 1
+        if current_focus == "left":
+            next_idx = current_index + 1
+            while next_idx < len(items):
+                if items[next_idx][1]:
+                    current_index = next_idx
+                    update_left_pane()
+                    break
+                next_idx += 1
+        elif current_focus == "right":
+            right_text_area.buffer.cursor_down(count=event.arg)
+
+    @kb.add("pageup")
+    def _(event):
+        if current_focus == "right":
+            right_text_area.buffer.cursor_up(count=15)
+
+    @kb.add("pagedown")
+    def _(event):
+        if current_focus == "right":
+            right_text_area.buffer.cursor_down(count=15)
 
     @kb.add("space")
     def _(event):
@@ -150,9 +182,9 @@ async def run_list_viewer(plan_lookup, base_dir):
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     content = f.read()
-                right_text_control.text = content
+                right_text_area.text = content
             except Exception as e:
-                right_text_control.text = f"파일을 읽는 중 오류가 발생했습니다: {e}"
+                right_text_area.text = f"파일을 읽는 중 오류가 발생했습니다: {e}"
 
     style = Style([
         ('bottom-toolbar', 'bg:#333333 #ffffff'),
