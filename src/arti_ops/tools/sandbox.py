@@ -32,17 +32,53 @@ class SandboxTool(BaseToolset):
         """
         try:
             from google.adk.code_executors import ContainerCodeExecutor
+            from google.adk.code_executors.code_execution_utils import CodeExecutionInput
+            from google.adk.agents.invocation_context import InvocationContext
+            from google.adk.sessions import Session
+            from google.adk.agents.base_agent import BaseAgent
+            
             executor = ContainerCodeExecutor(image=self.image)
             
             # ADK v1.27.0+ ContainerCodeExecutor 의 코드 실행 메커니즘
             logger.info("SandboxTool: Executing python code snippet in container...")
-            result = executor.run_code_snippet(code=code_snippet, auto_install_dependencies=True)
+            
+            # 더미 InvocationContext 생성 (execute_code 에 필수)
+            mock_session = Session(id="sandbox_test", appName="arti-ops", userId="test_user")
+            # 최소한의 속성을 가진 더미 에이전트 클래스 정의
+            class MockAgent(BaseAgent):
+                def __init__(self):
+                    super().__init__(name="mock", description="")
+                async def _invoke(self, *args, **kwargs):
+                    pass
+            mock_agent = MockAgent()
+            from google.adk.sessions.in_memory_session_service import InMemorySessionService
+            mock_session_service = InMemorySessionService()
+            
+            mock_context = InvocationContext(
+                invocation_id="test_inv",
+                session=mock_session,
+                session_service=mock_session_service,
+                agent=mock_agent,
+                agent_states={},
+                end_of_agents={},
+                end_invocation=False,
+                token_compaction_checked=False
+            )
+            
+            input_data = CodeExecutionInput(code=code_snippet, input_files=[])
+            # v1.27.0+ 에서는 execute_code 비동기/동기 여부 확인 필요, 일반적으론 async
+            # 만약 동기 함수라면 await 없이 실행해야 함
+            import inspect
+            if inspect.iscoroutinefunction(executor.execute_code):
+                result = await executor.execute_code(invocation_context=mock_context, code_execution_input=input_data)
+            else:
+                result = executor.execute_code(invocation_context=mock_context, code_execution_input=input_data)
             
             output_lines = []
-            if getattr(result, 'output', None):
-                output_lines.append(f"STDOUT:\n{result.output}")
-            if getattr(result, 'error', None):
-                output_lines.append(f"STDERR:\n{result.error}")
+            if getattr(result, 'stdout', None):
+                output_lines.append(f"STDOUT:\n{result.stdout}")
+            if getattr(result, 'stderr', None):
+                output_lines.append(f"STDERR:\n{result.stderr}")
                 
             return "\n\n".join(output_lines) if output_lines else "Success: No output produced."
         except Exception as e:

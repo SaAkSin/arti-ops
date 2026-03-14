@@ -38,6 +38,7 @@ class ArtiOpsPipeline:
         self.session_service = InMemorySessionService()
         self._pause_event = asyncio.Event()
         self._is_approved = False
+        self._human_feedback = "" # 🚨 신규 추가: 피드백 저장용 문자열
 
     def _create_runner(self, agent: Agent) -> Runner:
         return Runner(
@@ -106,11 +107,14 @@ class ArtiOpsPipeline:
                     logger.info("Pipeline paused for HITL approval. Waiting for resume()...")
                     self._pause_event.clear()
                     self._is_approved = False
+                    self._human_feedback = ""
                     await self._pause_event.wait()
                     
                     if not self._is_approved:
-                        ver_text += "\n\n[Human Review] 반려됨."
-                        reject_msg = Content(role="system", parts=[Part.from_text(text="**Human reviewer rejected the deployment.**")])
+                        reject_reason = self._human_feedback if self._human_feedback else "인간 관리자가 배포를 단순 반려했습니다."
+                        # "반려" 키워드를 넣어 하단 루프의 재시도(Retry) 조건이 발동되게 유도함
+                        ver_text += f"\n\n[Human Review 반려됨] 추가 피드백 지시사항: {reject_reason}"
+                        reject_msg = Content(role="system", parts=[Part.from_text(text=f"**Human rejected.** Reason/Feedback: {reject_reason}")])
                         yield type("DummyRejectEvent", (), {"author": "System", "content": reject_msg})()
                     else:
                         ver_text += "\n\n[Human Review] 승인됨."
@@ -149,10 +153,8 @@ class ArtiOpsPipeline:
         logger.info("--- Pipeline Completed Successfully ---")
 
     async def resume(self, session_id: str, action_response: dict) -> None:
-        """
-        HITL 등 이유로 중단되었던(Pause) 세션을 다시 재개합니다.
-        승인(approved) 시 이어서 파이프라인이 진행되도록 Event를 set() 합니다.
-        """
+        """HITL 승인 상태 및 자연어 피드백을 수신하여 이벤트를 재개합니다."""
         logger.info(f"Resuming pipeline for session {session_id} with response: {action_response}")
         self._is_approved = action_response.get("approved", False)
+        self._human_feedback = action_response.get("feedback", "")
         self._pause_event.set()
