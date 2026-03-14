@@ -25,9 +25,17 @@ logger = logging.getLogger(__name__)
 app = CycloptsApp(name="arti-ops", help="로컬 컨텍스트 기반 AgentOps CLI")
 console = Console()
 
-# 하단 프롬프트바 스타일 지정
+# 하단 프롬프트바 및 다이얼로그 스타일 지정 (기본 터미널 테마와 유사하게 배색)
 pt_style = Style.from_dict({
     'bottom-toolbar': 'bg:#333333 #ffffff',
+    'dialog': 'bg:#2b2b2b',
+    'dialog frame.label': 'bg:#2b2b2b #00ffff bold',
+    'dialog.body': 'bg:#2b2b2b #dddddd',
+    'dialog shadow': 'bg:#1a1a1a',
+    'checkbox': '#00ff00',
+    'checkbox-checked': '#00ff00 bold',
+    'button': 'bg:#444444 #ffffff',
+    'button.focused': 'bg:#00aa00 #ffffff bold',
 })
 
 async def run_interactive_loop(workspace: str, target_agent: str):
@@ -85,15 +93,22 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     console.print("[yellow]▼ 동기화할 수 있는 로컬(L3) 에셋(규칙, 스킬)을 찾을 수 없거나 BookStack 챕터 오류입니다.[/yellow]")
                     continue
                 
+                # 액션에 따른 심볼 매핑
+                def get_symbol(action):
+                    if action == "Create": return "!"
+                    elif action == "Update": return "*"
+                    elif action == "Match": return " "
+                    return " "
+
                 choices = [
-                    (item, f"[{item['action']}] {item['rel_path']}")
+                    (item, f"[{get_symbol(item['action'])}] {item['rel_path']}")
                     for item in plan
                 ]
                 
                 selected_plan = await asyncio.to_thread(
                     checkboxlist_dialog(
                         title="위키 연동 (BookStack Upsert)",
-                        text="방향키(↑/↓)와 스페이스바(Space)로 배포할 항목을 선택하거나 해제하세요.\n선택된 항목들만 BookStack에 전송되어 병합됩니다.",
+                        text="방향키(↑/↓)와 스페이스바(Space)로 배포할 항목을 선택하거나 해제하세요.\n[ ! : 신규 추가 | * : 위키와 로컬 내용 다름 (업데이트 대상) | 공백 : 완벽히 동일 (수정 불필요) ]",
                         values=choices,
                         style=pt_style
                     ).run

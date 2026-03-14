@@ -231,7 +231,14 @@ class BookStackToolset(BaseToolset):
                         continue
                         
                     chapter_id = chapter["id"]
-                    existing_pages = {p["name"]: p["id"] for p in chapter.get("pages", [])}
+                    
+                    # 챕터 상세 API를 호출하여 정확한 하위 페이징 정보를 가져온다 (버그 픽스)
+                    chapter_detail_url = f"{self.api_url}/chapters/{chapter_id}"
+                    chap_res = await client.get(chapter_detail_url, headers=headers)
+                    chap_res.raise_for_status()
+                    chapter_detail = chap_res.json()
+                    
+                    existing_pages = {p["name"]: p["id"] for p in chapter_detail.get("pages", [])}
                     
                     if not os.path.exists(target_dir):
                         continue
@@ -278,6 +285,26 @@ class BookStackToolset(BaseToolset):
                                         "chapter_id": chapter_id,
                                         "page_id": page_id
                                     })
+                                    
+                # 4. Update 대상들의 본문 내용을 병렬로 가져와서 변경 여부(Match) 판별
+                update_items = [item for item in plan if item["action"] == "Update"]
+                
+                async def fetch_and_compare(item):
+                    page_url = f"{self.api_url}/pages/{item['page_id']}"
+                    try:
+                        res = await client.get(page_url, headers=headers)
+                        res.raise_for_status()
+                        remote_markdown = res.json().get("markdown", "")
+                        
+                        # \r\n 정규화 후 비교
+                        if remote_markdown.replace("\r\n", "\n").strip() == item["content"].replace("\r\n", "\n").strip():
+                            item["action"] = "Match"
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch content for comparison: {e}")
+
+                if update_items:
+                    await asyncio.gather(*(fetch_and_compare(item) for item in update_items))
+                    
             except Exception as e:
                 logger.error(f"Error generating upsert plan: {e}")
                 
