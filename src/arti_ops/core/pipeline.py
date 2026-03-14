@@ -33,9 +33,9 @@ class ArtiOpsPipeline:
         send_summary_tool = FunctionTool(func=self.gws_chat_tool.send_summary)
         
         # 2. 에이전트 선언 (각 역할별 도구 주입)
-        self.profiler = get_profiler_agent(tools=[self.bookstack_tool])
+        self.profiler = get_profiler_agent(tools=[self.bookstack_tool, self.file_io_tool])
         self.architect = get_architect_agent(tools=[]) # 기획 에이전트는 외부에 툴 노출 없이 추론만 집중
-        self.verifier = get_verifier_agent(tools=[self.gws_chat_tool])
+        self.verifier = get_verifier_agent(tools=[])
         
         executor_tools = [self.file_io_tool, self.sandbox_tool, self.bookstack_tool, send_summary_tool]
         self.executor = get_executor_agent(tools=executor_tools)
@@ -120,9 +120,7 @@ class ArtiOpsPipeline:
             msg_ver = Content(role="user", parts=[Part.from_text(text=verifier_input)])
             ver_text = ""
             
-            self.gws_chat_tool.pause_requested = False  # 루프 시작 전 플래그 초기화
-            
-            # 1. 스트리밍 텍스트 수집 (이벤트 루프 안의 고장난 pause 로직을 모두 제거)
+            # 1. 스트리밍 텍스트 수집
             async for event in runner_ver.run_async(user_id="cli_user", session_id=session_id, new_message=msg_ver):
                 if hasattr(event, "function_calls") and event.function_calls:
                     for call in event.function_calls:
@@ -130,47 +128,12 @@ class ArtiOpsPipeline:
                 yield event
                 if getattr(event, "content", None) and getattr(event.content, "parts", None):
                     ver_text += "".join([part.text for part in event.content.parts if part.text])
-            
-            # 2. 스트림 종료 후, 툴 호출 여부를 기반으로 파이프라인 명시적 정지 (HITL)
-            is_hitl_triggered = getattr(self.gws_chat_tool, "pause_requested", False)
-            if is_hitl_triggered:
-                self.gws_chat_tool.pause_requested = False # 플래그 초기화
-                logger.info("Pipeline paused for HITL approval. Waiting for resume()...")
-                
-                # main.py의 CLI UI가 프롬프트를 띄울 수 있도록 트리거 이벤트 전달
-                yield {"status": "pending_approval"}
-                
-                # 블로킹 대기 시작
-                self._pause_event.clear()
-                self._is_approved = False
-                self._human_feedback = ""
-                await self._pause_event.wait()
-                
-                # 대기 해제 후 승인/반려 판단
-                if not self._is_approved:
-                    reject_reason = self._human_feedback if self._human_feedback else "관리자가 배포를 거절했습니다."
-                    logger.warning(f"HITL Rejected: {reject_reason}")
-                    ver_text += f"\n\n[관리자 반려] {reject_reason}"
-                    
-                    sys_msg = Content(role="system", parts=[Part.from_text(text=f"\n\n**[시스템] 관리자 반려됨:** {reject_reason}\n")])
-                    yield type("DummySystemEvent", (), {"author": "System", "content": sys_msg})()
-                else:
-                    logger.info("HITL Approved.")
-                    ver_text += f"\n\n[관리자 승인] 강제 배포 진행"
-                    
-                    sys_msg = Content(role="system", parts=[Part.from_text(text="\n\n**[시스템] 관리자 승인 완료. 배포를 진행합니다.**\n")])
-                    yield type("DummySystemEvent", (), {"author": "System", "content": sys_msg})()
 
-            # 3. Verifier 결과 분석 (정교한 키워드 검사 및 관리자 강제 승인 오버라이드)
+            # 2. Verifier 결과 분석 (키워드 검사)
             lower_ver_text = ver_text.lower()
             reject_keywords = ["반려", "reject", "실패", "failed", "거절", "치명적", "중단"]
             
-            if is_hitl_triggered and self._is_approved:
-                # 관리자가 수동 승인한 경우, 에러 키워드가 있어도 강제로 통과시킴
-                verifier_passed = True
-                logger.info("Verifier passed the plan (Admin Approved). Proceeding to Executor.")
-                current_input = f"[critical_verifier 산출물 및 관리자 승인 내역]\n{ver_text}\n\n관리자가 위험을 감수하고 최종 승인했습니다. 위 산출물을 바탕으로 배포 임무를 수행하세요."
-            elif any(kw in lower_ver_text for kw in reject_keywords):
+            if any(kw in lower_ver_text for kw in reject_keywords):
                 logger.warning(f"Verifier rejected the plan. Retrying... ({retry_count+1}/{max_retries})")
                 retry_count += 1
                 current_input = f"[critical_verifier 반려 사유]\n{ver_text}\n\n위 반려 사유를 바탕으로 산출물을 다시 제출하세요."
@@ -181,7 +144,8 @@ class ArtiOpsPipeline:
                 # 최종 강제 검토 대기 (Mandatory HITL)
                 yield {
                     "status": "pending_final_approval", 
-                    "message": "최종 적용 전 산출물을 확인하고 승인/피드백을 입력하세요."
+                    "message": "최종 적용 전 산출물을 확인하고 승인/피드백을 입력하세요.",
+                    "report": ver_text
                 }
                 
                 self._pause_event.clear()

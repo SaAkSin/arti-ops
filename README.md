@@ -1,34 +1,26 @@
-# arti-ops v0.1.0 (ADK 기반 AgentOps 플랫폼)
+# arti-ops v0.5.0 (AI AgentOps TUI 플랫폼)
 
-`arti-ops`는 사내 BookStack(위키)에 정의된 20개 이상의 다중 프로젝트 가이드라인과 전사(Global) 보안 정책을 개발자의 로컬 환경(`.agents/` 등)에 충돌 없이 동기화해 주는 **지능형 CLI / TUI 클라이언트**입니다.
+`arti-ops`는 사내 BookStack(위키)에 정의된 20개 이상의 다중 프로젝트 가이드라인과 전사(Global) 보안 정책을 개발자의 로컬 환경과 **자동으로 융합(Soft-Merge)** 및 배포하는 **지능형 전체화면 TUI 클라이언트**입니다.
 
 ## 🚀 주요 기능
 
-### 1. Docs-as-Agent (위키 연동)
-BookStack 에 자연어로 작성해둔 룰셋을 API로 가져와 개발 환경 구성 코드로 변환/적용합니다.
-(현재 L1 Global 규칙과 L2 Workspace 규칙의 혼합 지원)
+### 1. 로컬 컨텍스트 기반 프롬프트 주도 생성
+단순히 위키 텍스트를 다운로드 하는 것이 아니라, 명령어가 실행된 **현재 디렉토리(`os.getcwd()`)의 소스코드 및 기존 `.agents/` 내용**을 딥스캔하여 사용자의 자연어 지시에 딱 맞는 최적의 Rule과 Skill 파일을 자동 생성합니다.
 
 ### 2. Multi-Agent 파이프라인 (Google ADK 기반)
-*   **ContextProfiler:** 호스트 상태와 원격 정책 스캔.
-*   **SkillArchitect:** 계층형(Mix-in) 파이썬 배포 스크립트 작성.
-*   **CriticalVerifier:** 핵심 보안 위반 및 파괴적 코드 변경 감사 (Red-Team).
-*   **DeploymentExecutor:** `ContainerCodeExecutor` 를 통한 샌드박스 안전 격리 검증 및 배포 적용.
+* **ContextProfiler:** BookStack(L1/L2 정책) 및 로컬 디렉토리 코드베이스 스캔.
+* **SkillArchitect:** 수집된 컨텍스트와 지시어를 융합하여 계층형 파이썬/마크다운 스크립트 도출.
+* **CriticalVerifier:** 글로벌 정책 위반 감사 및 TUI 화면에 출력할 [최종 반영 보고서] 생성 (Red-Team).
+* **DeploymentExecutor:** 샌드박스 검증 및 최종 `.agents/` 디렉토리 I/O 배포. 완료 시 GWS 요약 알림 전송.
 
-### 3. GWS ChatOps (Human-in-the-Loop)
-치명적 병합 충돌이나 관리자의 승인이 필요한 파괴적 변경 발생 시 프로세스를 강제 중단(Pause)하고 구글 워크스페이스 챗봇 웹훅으로 승인 카드를 통보합니다. (현재 로직 구성 완료상태)
-
-### 4. 실시간 TUI 뷰어 (Claude CLI Style)
-터미널에서 명령어 입력 시 `Textual` 라이브러리로 구성된 대시보드를 통해 에이전트들의 진행 궤적과 로그를 실시간 채팅(ChatBubble) 형식으로 스트리밍 열람 가능합니다.
-
----
-
-## 📖 핵심 가이드 문서
-- [TUI 실행 및 단축키 매뉴얼](docs/tui_manual.md)
-- [Docker 샌드박스 설정 가이드](docs/docker_guide.md)
+### 3. 전체화면 대화형 TUI (Textual 기반)
+터미널에서 명령어 입력 시 `Textual` 라이브러리로 구성된 대시보드를 통해 에이전트들의 진행 궤적과 로그를 실시간으로 열람 가능하며, 하단 프롬프트를 통해 자유롭게 피드백을 주고 지시할 수 있습니다.
+* **즉시 종료:** `q` 입력 시 언제든 안전하게 프로세스 강제 종료(Kill-switch).
+* **Self-Correction:** 배포 직전 보고서를 확인 후, 추가 지시사항을 입력하면 AI가 스스로 기획을 수정합니다.
 
 ---
 
-## 💻 설치 및 동작 방식
+## 💻 설치 방법
 
 본 프로젝트는 의존성 관리 도구인 `uv` 기반으로 설계되었습니다. 파이썬 `3.10` 이상의 버전을 권장합니다.
 
@@ -40,15 +32,15 @@ cd arti-ops
 # uv 환경설정 및 설치
 uv sync
 
-# CLI 테스트 및 확인
-uv run arti-ops --help
+# TUI 앱 접속
+uv run arti-ops
 ```
 
 ### 테스트용 실행 명령어
 
-*타겟이 되는 가상의 워크스페이스 프로젝트 아이디를 뒤에 넣습니다.*
+*타겟 프로젝트 ID와 에이전트 종류를 수동으로 지정할 수 있습니다.*
 ```bash
-uv run arti-ops sync --workspace Project_Alpha
+uv run arti-ops "Project_Alpha" "antigravity"
 ```
 
 ## ⚙️ (참고) 개발자용 Rocky Linux 9 구동 가이드
@@ -66,10 +58,7 @@ export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/podman/podman.sock"
 
 ## 🛠 기술 스택
 
-*   **Language:** Python 3.10+
-*   **Agent Framework:** Google ADK (`Agent`, `Runner`, `WorkflowEngine`)
-*   **Dependencies:** `Textual` (TUI), `httpx` (API Client), `pydantic`
-*   **Testing/Env:** `uv` (Fast Python Package Installer)
-
-## 📌 라이선스 및 문의
-사내 전용 툴셋으로 각 프로젝트 별 PM (BookStack 담당자)에게 L2 권한 문의 바랍니다.
+* **Language:** Python 3.10+
+* **Agent Framework:** Google ADK (`Agent`, `Runner`, `WorkflowEngine`)
+* **Dependencies:** `textual` (TUI), `httpx` (API Client), `pydantic`
+* **Test/Build:** `uv`, `pytest`

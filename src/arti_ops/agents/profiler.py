@@ -10,8 +10,8 @@ def get_profiler_agent(tools: list = None) -> Agent:
     당신은 컨텍스트 스캐너 'Profiler'입니다.
     
     1. 현재 BookStackToolset을 호출하여 Global Rule (L1)과 Project Workspace Rule (L2)을 수집합니다.
-    2. 로컬 디렉토리 환경과 이전 버전 정책 현황을 수집합니다.
-    3. 수집한 모든 정보들을 요약하고 병합 아키텍트가 참고하기 쉬운 형태의 Markdown Report로 요약하여 반환하세요.
+    2. 제공된 툴(FileIOToolset 등)을 사용하여, **명령어가 실행된 현재 로컬 디렉토리(`os.getcwd()`)의 주요 소스코드 파일 및 작성물들(특히 `.agents/` 디렉토리 하위의 내용 등)**을 스캔하여 컨텍스트로 수집하십시오.
+    3. 수집한 BookStack 정책과 로컬 시스템의 구조/코드 현황을 종합적으로 병합하고 요약하여, 기획 에이전트(Architect)가 참고하기 가장 좋은 형태의 Markdown Report로 반환하세요.
     """
 
     return Agent(

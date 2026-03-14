@@ -1,71 +1,27 @@
 import os
 import asyncio
 from typing import Dict, Any
-from google.adk.tools import LongRunningFunctionTool
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict
 import logging
 
 logger = logging.getLogger(__name__)
 
-class GwsChatTool(LongRunningFunctionTool):
+class GwsChatTool:
     """
-    gws CLI를 통해 배포 전 파일 변경 사항이나 충돌 사항을 알리고,
-    PM/Manager의 승인(Resume)이 있을 때까지 ADK 파이프라인 엔진을 대기(Pause)시키는 HITL 툴.
+    gws CLI를 통해 배포가 모두 완료된 후 가장 마지막에 요약 알림을 전송하는 단방향 통신 툴입니다.
     """
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
     def __init__(self, **data):
-        super().__init__(func=self.run, **data)
-        self.pause_requested = False  # 🚨 파이프라인용 상태 플래그 추가
+        super().__init__()
         
     @property
     def gws_space_id(self) -> str:
         return os.getenv("GWS_SPACE_ID", "")
 
-    async def request_approval(self, project_id: str, diff_md: str, conflict_reason: str) -> None:
-        """
-        gws CLI 쉘 명령어로 메시지를 전송합니다.
-        
-        Args:
-            project_id (str): 대상 프로젝트 아이디
-            diff_md (str): 적용될 파일 내용 (Diff)
-            conflict_reason (str): 충돌 사유나 특이사항
-        """
-        if not self.gws_space_id:
-            logger.warning("GWS_SPACE_ID is not set. Skipped CLI webhook.")
-            return
-
-        message_body = (
-            f"🚀 *arti-ops 배포 승인 요청* [{project_id}]\n\n"
-            f"**충돌/보고 사유:** {conflict_reason}\n\n"
-            f"---\n\n{diff_md}"
-        )
-
-        try:
-            # gws cli 실행 시 사용자 OS의 기본 전역 자격 증명(~/.config/gws)을 인식하여 메시지를 발송합니다.
-            env = os.environ.copy() # Linux PATH 유실 방지
-            process = await asyncio.create_subprocess_exec(
-                "gws", "chat", "+send",
-                "--space", self.gws_space_id,
-                "--text", message_body,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env
-            )
-            stdout, stderr = await process.communicate()
-            
-            if process.returncode == 0:
-                logger.info(f"[{project_id}] GWS 메시지 발송 완료 via CLI.")
-            else:
-                logger.error(f"[{project_id}] GWS 메시지 발송 실패: {stderr.decode('utf-8')}")
-
-        except Exception as e:
-            logger.exception(f"gws cli 호출 중 에러 발생: {e}")
-            
     async def send_summary(self, project_id: str, summary: str) -> str:
         """
         파이프라인의 배포가 모두 완료된 후 가장 마지막에 호출되는 단순 알림용(Non-blocking) 메서드입니다.
-        Yield(Pause)를 발생시키지 않기 위해 일반 문자열을 반환합니다.
         """
         if not self.gws_space_id:
             logger.warning("GWS_SPACE_ID is not set. Skipped summary webhook.")
@@ -99,19 +55,3 @@ class GwsChatTool(LongRunningFunctionTool):
         except Exception as e:
             logger.exception(f"gws summary 발송 중 에러 발생: {e}")
             return f"Error occurred: {str(e)}"
-    
-    # Run은 LongRunningFunctionTool의 표준 호출 메서드를 재정의 또는 확장에 사용
-    async def run(self, project_id: str, diff_md: str, conflict_reason: str) -> Dict[str, Any]:
-        """
-        이 메서드가 호출되면 LongRunningFunctionTool의 특성에 의해 파이프라인이 즉시 일시정지(Yield)됩니다.
-        호출 전에 gws CLI를 통해 승인 요청 메시지를 보냅니다.
-        """
-        self.pause_requested = True   # 🚨 툴이 호출되었음을 마킹
-        
-        await self.request_approval(project_id, diff_md, conflict_reason)
-        # return 한 내용은 Runner 쪽에서 일시 정지(Pause) 이벤트를 식별하는 데이터로 활용됩니다.
-        return {
-            "status": "pending_approval",
-            "project_id": project_id,
-            "message": "Waiting for GWS approval callback"
-        }
