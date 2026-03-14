@@ -108,6 +108,31 @@ class BookStackToolset(BaseToolset):
                         
                         md_content = page_res.json().get("markdown", "")
                         
+                        # [NEW] Extract and save attached scripts from markdown Fenced Code Blocks
+                        import re
+                        pattern = r'````(\w+)\s+filepath="([^"]+)"\r?\n(.*?)\r?\n````'
+                        matches = list(re.finditer(pattern, md_content, re.DOTALL))
+                        
+                        if matches:
+                            base_skill_dir = os.path.join(os.getcwd(), f".agents/{target}/{page_name}")
+                            for match in matches:
+                                lang, filepath, script_content = match.groups()
+                                full_path = os.path.normpath(os.path.join(base_skill_dir, filepath))
+                                
+                                # 보안 검사 (디렉토리 이탈 방지)
+                                if os.path.commonpath([base_skill_dir, full_path]) == base_skill_dir:
+                                    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                                    with open(full_path, "w", encoding="utf-8") as sf:
+                                        sf.write(script_content)
+                                    logger.info(f"Extracting script: {full_path}")
+                                
+                                md_content = md_content.replace(match.group(0), "")
+                                
+                            # 정리
+                            md_content = md_content.replace("### 🛠️ Scripts & Dependencies", "").strip()
+                            # 찌꺼기 공백 제어
+                            md_content = re.sub(r'---\n+$', '', md_content).strip()
+
                         # 명시적인 로컬 매핑 경로 주입
                         if target == "rules":
                             expected_path = f".agents/{target}/{page_name}.md"
@@ -273,6 +298,31 @@ class BookStackToolset(BaseToolset):
                                     with open(skill_file, "r", encoding="utf-8") as f:
                                         content = f.read()
                                         
+                                    # [NEW] Append other files in skill_dir as fenced code blocks
+                                    has_extra = False
+                                    for root, _, files in os.walk(skill_dir):
+                                        if "__pycache__" in root: continue
+                                        for fname in files:
+                                            if fname == "SKILL.md" or fname.endswith(".pyc") or fname.startswith("."): continue
+                                            fpath = os.path.join(root, fname)
+                                            sub_rel = os.path.relpath(fpath, skill_dir)
+                                            
+                                            try:
+                                                with open(fpath, "r", encoding="utf-8") as xf:
+                                                    xcontent = xf.read()
+                                            except Exception:
+                                                continue
+                                                
+                                            ext = fname.split('.')[-1] if '.' in fname else 'text'
+                                            lang_map = {'py': 'python', 'sh': 'bash', 'json': 'json', 'yaml': 'yaml', 'yml': 'yaml', 'md': 'markdown', 'js': 'javascript', 'ts': 'typescript'}
+                                            lang = lang_map.get(ext, ext)
+                                            
+                                            if not has_extra:
+                                                content += "\n\n---\n### 🛠️ Scripts & Dependencies\n"
+                                                has_extra = True
+                                            
+                                            content += f"\n````{lang} filepath=\"{sub_rel}\"\n{xcontent}\n````\n"
+                                            
                                     page_name = skill_name
                                     page_id = existing_pages.get(page_name)
                                     action = "Update" if page_id else "Create"

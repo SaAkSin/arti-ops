@@ -8,8 +8,9 @@
 # 민감한 환경 설정 파일 및 로그, AI 부속물, 패키지 락 파일 등은 철저히 제외됩니다.
 # ==============================================================================
 
-# 작업 디렉토리가 항상 루트가 되도록 보장
-cd "$(dirname "$0")" || exit 1
+# 스크립트 실행 위치(scripts 디렉토리) 기준으로 4단계 상위 프로젝트 루트(arti-ops)로 이동
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+cd "$SCRIPT_DIR/../../../.." || { echo "Failed to navigate to project root."; exit 1; }
 
 OUTPUT_FILE="docs/llms.txt"
 TMP_FILE="docs/llms_tmp.txt"
@@ -35,7 +36,7 @@ echo "" >> "$OUTPUT_FILE"
 # 6. ^\.gitignore$ : 형상관리 설정 파일 제외
 EXCLUDE_PATTERN="^docs/|^\.agents/|^\.cursor/|^GEMINI\.md$|llms.*\.txt$|^\.env(\..+)?$|^\.gitignore$|.*\.lock$|\.(png|jpeg|jpg|gif|svg|ico|ttf|woff|woff2|eot|pdf|mp4|webm|zip|tar|gz|db|sqlite|sqlite3)$"
 
-echo "[Info] Gathering Git tracked files..."
+echo "[Info] Gathering Git tracked files from root: $(pwd)"
 
 # git ls-files를 통해 변경내역에 있는 소스만을 가져옴 (빌드 폴더 node_modules 등 제외됨)
 # egrep -v -E 로 블랙리스트 필터를 거침
