@@ -1,6 +1,7 @@
 import os
 import httpx
 import logging
+import asyncio
 from typing import Optional, Dict, Any
 from google.adk.tools import BaseTool, FunctionTool
 from google.adk.tools.base_toolset import BaseToolset
@@ -14,8 +15,14 @@ class BookStackToolset(BaseToolset):
     Global(L1) 및 Workspace(L2) 정책을 마크다운 형태로 가져오고, 
     배포 결과를 Release Notes로 퍼블리시합니다.
     """
+    _ui_queue: Any = None # 클래스 변수로 선언하여 복제 시에도 참조 유지
+
+    @classmethod
+    def set_ui_queue(cls, queue: asyncio.Queue):
+        cls._ui_queue = queue
+
     def __init__(self, **kwargs):
-        super().__init__()
+        super().__init__(**kwargs)
         self.api_url = os.getenv("BOOKSTACK_API_URL", "")
         self.token_id = os.getenv("BOOKSTACK_TOKEN_ID", "")
         self.token_secret = os.getenv("BOOKSTACK_TOKEN_SECRET", "")
@@ -94,14 +101,36 @@ class BookStackToolset(BaseToolset):
                         
                     for page_info in pages:
                         page_id = page_info["id"]
+                        page_name = page_info.get("name", f"page_{page_id}")
                         page_url = f"{self.api_url}/pages/{page_id}"
                         page_res = await client.get(page_url, headers=headers)
                         page_res.raise_for_status()
                         
                         md_content = page_res.json().get("markdown", "")
-                        combined_markdown.append(f"### {page_info.get('name')}\n\n{md_content}")
                         
-                        logger.info(f"====== [BookStack API] Fetched Page '{page_info.get('name')}' in Chapter '{target}' ======\n{md_content}\n=======================================================")
+                        # 명시적인 로컬 매핑 경로 주입
+                        if target == "rules":
+                            expected_path = f".agents/{target}/{page_name}.md"
+                        else:  # skills 등 기타
+                            expected_path = f".agents/{target}/{page_name}/SKILL.md"
+                        combined_markdown.append(f"### {page_name} (Expected Path: {expected_path})\n\n{md_content}")
+                        
+                        logger.info(f"====== [DEBUG UI_QUEUE] type is: {type(self._ui_queue)} ======")
+                        if getattr(self, "_ui_queue", None):
+                            await self._ui_queue.put({
+                                "type": "ui_message",
+                                "data": {
+                                    "type": "subnode_add",
+                                    "agent": "context_profiler",
+                                    "message": f"☁️ 위키 연동: {expected_path}",
+                                    "color": "cyan"
+                                }
+                            })
+                            logger.info(f"====== [DEBUG UI_QUEUE] put message to ui_queue for {page_name}.md ======")
+                        else:
+                            logger.error(f"====== [DEBUG UI_QUEUE] ui_queue is NONE for {page_name}.md! ======")
+                        
+                        logger.info(f"====== [BookStack API] Fetched Page '{page_name}' in Chapter '{target}' ======\n{md_content}\n=======================================================")
                 
                 return "\n\n".join(combined_markdown)
                 

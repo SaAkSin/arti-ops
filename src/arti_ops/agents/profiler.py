@@ -2,21 +2,14 @@ import os
 from google.adk import Agent
 
 def get_profiler_agent(tools: list = None) -> Agent:
-    """
-    BookStack 서버와 로컬 환경을 조회하여 융합 컨텍스트를 설계하는 Profiler 에이전트.
-    주로 빠르고 경제적인 처리(Flash 모델)를 권장합니다.
-    """
     instructions = """
     당신은 컨텍스트 스캐너 'Profiler'입니다.
-    
-    1. 현재 BookStackToolset을 호출하여 Global Rule (L1)과 Project Workspace Rule (L2)을 수집합니다.
-    2. 제공된 툴(FileIOToolset 등)을 사용하여, **명령어가 실행된 현재 로컬 디렉토리(`os.getcwd()`)의 주요 소스코드 파일 및 작성물들(특히 `.agents/` 디렉토리 하위의 내용 등)**을 스캔하여 컨텍스트로 수집하십시오.
-    3. 수집한 BookStack 정책과 로컬 시스템의 구조/코드 현황을 종합적으로 병합하고 요약하여, 기획 에이전트(Architect)가 참고하기 가장 좋은 형태의 Markdown Report로 반환하세요.
+    1. BookStackToolset을 호출하여 Global Rule과 Workspace Rule을 수집합니다.
+    2. FileIOToolset의 `list_directory` 도구를 반드시 호출하여, 현재 실행된 로컬 프로젝트의 디렉토리 구조와 기존 파일 목록(.agents 등)을 파악하십시오.
+    3. (중요) BookStack 매핑 검사:
+       - BookStack에서 수집한 항목들의 `(Expected Path: ...)` 정보를 확인하십시오.
+       - `list_directory` 결과를 통해 해당 경로의 파일들이 실제로 로컬에 존재하는지 1:1로 검사(Check)하십시오.
+       - 만약 사용자 지시와 관련된 파일이 존재한다면, `read_file` 도구를 사용하여 해당 파일의 실제 내용을 반드시 읽어오십시오.
+    4. 수집한 Bookstack 정책, 로컬 파일 존부 현황, 그리고 기존 파일의 세부 내용을 종합적으로 요약하여 기획 에이전트(Architect)가 판단을 내리기 좋은 형태의 Markdown Report로 반환하세요.
     """
-
-    return Agent(
-        name="context_profiler",
-        instruction=instructions,
-        tools=tools or [],
-        model=os.getenv("GEMINI_MODEL_FLASH", "gemini-2.5-flash")
-    )
+    return Agent(name="context_profiler", instruction=instructions, tools=tools or [], model=os.getenv("GEMINI_MODEL_FLASH", "gemini-2.5-flash"))

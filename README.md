@@ -13,8 +13,9 @@
 * **CriticalVerifier:** 글로벌 정책 위반 감사 및 TUI 화면에 출력할 [최종 반영 보고서] 생성 (Red-Team).
 * **DeploymentExecutor:** 샌드박스 검증 및 최종 `.agents/` 디렉토리 I/O 배포. 완료 시 GWS 요약 알림 전송.
 
-### 3. 전체화면 대화형 TUI (Textual 기반)
-터미널에서 명령어 입력 시 `Textual` 라이브러리로 구성된 대시보드를 통해 에이전트들의 진행 궤적과 로그를 실시간으로 열람 가능하며, 하단 프롬프트를 통해 자유롭게 피드백을 주고 지시할 수 있습니다.
+### 3. 전체화면 대화형 TUI (Native IME 기반)
+터미널에서 명령어 입력 시 `rich`와 `prompt_toolkit` 라이브러리로 구성된 대시보드를 통해 에이전트들의 진행 궤적, 상태 트리를 실시간으로 열람 가능하며, 하단 프롬프트를 통해 한글을 완벽히 지원하며 자유롭게 피드백을 주고 지시할 수 있습니다.
+* **캐시 리셋:** `r` 또는 `reset` 입력 시 즉각적으로 기존 세션 DB 정보를 지우고 백지 상태로 초기화합니다.
 * **즉시 종료:** `q` 입력 시 언제든 안전하게 프로세스 강제 종료(Kill-switch).
 * **Self-Correction:** 배포 직전 보고서를 확인 후, 추가 지시사항을 입력하면 AI가 스스로 기획을 수정합니다.
 
@@ -60,5 +61,5 @@ export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/podman/podman.sock"
 
 * **Language:** Python 3.10+
 * **Agent Framework:** Google ADK (`Agent`, `Runner`, `WorkflowEngine`)
-* **Dependencies:** `textual` (TUI), `httpx` (API Client), `pydantic`
+* **Dependencies:** `rich`, `prompt_toolkit` (TUI), `httpx` (API Client), `pydantic`
 * **Test/Build:** `uv`, `pytest`
