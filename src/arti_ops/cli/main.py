@@ -108,10 +108,23 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     elif action == "Match": return " "
                     return " "
 
-                choices = [
-                    (item, f"[{get_symbol(item['action'])}] {item['rel_path']}")
-                    for item in plan
-                ]
+                choices = []
+                for item in plan:
+                    display_text = f"[{get_symbol(item['action'])}] {item['rel_path']}"
+                    
+                    if item.get("type") == "skills":
+                        skill_dir = os.path.join(os.getcwd(), os.path.dirname(item["rel_path"]))
+                        if os.path.exists(skill_dir):
+                            for root, dirs, files in os.walk(skill_dir):
+                                for file in sorted(files):
+                                    if file == "SKILL.md" or file.startswith(".") or file.endswith(".pyc"):
+                                        continue
+                                    
+                                    sub_path = os.path.join(root, file)
+                                    rel_sub = os.path.relpath(sub_path, skill_dir)
+                                    display_text += f"\n      ↳ {rel_sub}"
+                                    
+                    choices.append((item, display_text))
                 
                 selected_plan = await asyncio.to_thread(
                     checkboxlist_dialog(

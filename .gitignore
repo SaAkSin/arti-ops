@@ -43,4 +43,4 @@ logs/*.log
 credentials/
 
 # Target Workspace (Local Sync Dir)
-src/arti_ops/__pycache__/__init__.cpython-310.pyc
+.artiops.toml

@@ -15,60 +15,55 @@
 
 ---
 
-## 2. 1분 자동 설치 (초기 세팅)
+## 2. 1분 자동 설치 전역(Global) 셋업
 
-`arti-ops`는 `uv`를 통해 의존성과 가상환경 관리를 한 번에 해결합니다. 복잡한 `pip install` 과정 없이 아래 명령어를 순서대로 실행하세요.
+`arti-ops`는 파이썬 패키지 매니저인 `uv`를 통해 시스템 전역에 격리된 상태로 매우 쉽게 설치할 수 있습니다.
+한 번 설치하면 어느 폴더에서나 `arti-ops` 명령어를 바로 사용할 수 있습니다.
 
-### шаг 1: 저장소 클론
+### шаг 1: `uv tool`을 이용한 전역 설치
+터미널에서 아래 명령어를 실행하여 툴을 전역으로 설치합니다.
 ```bash
-git clone https://github.com/SaAkSin/arti-ops.git
-cd arti-ops
+uv tool install git+https://github.com/SaAkSin/arti-ops.git
 ```
+*(추가 확장 기능이 필요한 경우 패키지 설치 시 `[extensions]` 등의 옵션을 부여할 수 있습니다.)*
 
-### шаг 2: 의존성 동기화 및 가상 환경 자동 생성
-이 명령어 하나로 `.python-version`과 `pyproject.toml`에 명시된 버전의 Python 다운로드와 패키지 설치가 완료됩니다.
+### шаг 2: `arti-ops init` 환경 초기화
+설치가 완료되면, 터미널 아무 경로(또는 첫 프로젝트 디렉토리)에서 아래 명령어를 쳐서 전역 인증 환경을 구성합니다.
 ```bash
-uv sync
-
-# 만약 샌드박스(Docker) 기능이 필요하다면 아래 명령어로 확장을 추가로 설치하세요.
-uv add "google-adk[extensions]" 
+arti-ops init
 ```
-
-### шаг 3: 환경 변수 설정
-프로젝트 루트 템플릿(`.env.example`)을 복사하여 `.env` 파일을 생성하고 필수 값을 입력합니다.
-```bash
-cp .env.example .env
-nano .env  # 텍스트 편집기로 API 키 및 각종 정책 설정값 입력
-```
-*핵심 변수:* `GEMINI_API_KEY`, `GWS_SPACE_ID` (기타 DB 경로 등)
+이 명령어는 대화형 마법사를 실행하여 다음 사항들을 처리해 줍니다:
+1. 로컬 폴더 생태계 스캐폴딩 (`.agents/rules`, `.agents/skills`)
+2. 로컬 프로젝트 식별자 생성 (`.artiops.toml`)
+3. **최초 1회 한정**, 글로벌 통합 인증 정보 입력 (Gemini API, BookStack 등)
+   - 입력된 인증키들은 `~/.arti-ops/credentials` 파일에 안전하게 저장되며 이후 모든 프로젝트에서 재활용됩니다.
 
 ---
 
-## 3. 손쉬운 실행 및 에일리어스(Alias) 등록
+## 3. 손쉬운 실행 
 
-매번 `uv run arti-ops ...` 를 타이핑하는 번거로움을 줄이려면 터미널 설정 파일(`.bashrc` 또는 `.zshrc`)에 별칭을 등록하여 시스템 전역에서 사용할 수 있습니다.
-
-```bash
-# 본인 환경에 맞게 절대 경로 변경 필요
-echo "alias arti-ops='cd /절대/경로/arti-ops && uv run arti-ops'" >> ~/.bashrc
-source ~/.bashrc
-```
-
-이제 터미널 어디서든 아래 명령어만으로 최신 룰 동기화 TUI 앱을 켤 수 있습니다! 🎉
+모든 셋업이 완료되었습니다! 
+이제 터미널 어디서든 작업 중인 경로 내에서 아래 명령어만으로 대화형 AI TUI 앱이나 배포 동기화를 켤 수 있습니다! 🎉
 
 ```bash
-arti-ops sync --workspace <대상-프로젝트-ID>
-# 예: arti-ops sync --workspace DEMO-W-999
+# 기본 대화형 모드 진입 (현재 폴더명을 Project ID로 인식)
+arti-ops
+
+# 명시적으로 워크스페이스 타겟팅
+arti-ops --workspace <대상-프로젝트-ID>
+# 예: arti-ops --workspace DEMO-W-999
+
+# 다양한 단축 명령어
+arti-ops u  # 로컬 에셋을 BookStack으로 배포(Upsert)
+arti-ops l  # 로컬 에셋 현황 조회(List Viewer)
 ```
 
 ---
 
 ## 4. 업데이트 및 유지 보수
 
-BookStack 룰이 아니라, `arti-ops` 플랫폼 자체의 코어 소스나 ADK 버전이 업데이트되었다면 아래 두 줄로 최신화가 끝납니다.
+`arti-ops` 플랫폼 자체의 소스나 기능이 업데이트되었다면, 아래 명령어로 전역 설치본을 최신화할 수 있습니다.
 
 ```bash
-cd arti-ops
-git pull origin main
-uv sync
+uv tool upgrade arti-ops
 ```

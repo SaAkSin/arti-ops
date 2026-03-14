@@ -77,8 +77,8 @@ class Configurator:
         # 1. Local first
         if key in self.local_config:
             return self.local_config[key]
-        # 2. Global second
-        return self.global_config.get(key.upper(), default)
+        # 2. Global second (configparser uses lowercase keys by default)
+        return self.global_config.get(key.lower(), default)
         
     def get_db_url(self):
         return self.db_path
