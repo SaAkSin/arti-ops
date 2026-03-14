@@ -6,7 +6,7 @@
 [ TUI Layer (Local Console) ]
   └── 🖥️ Native IME 기반 Full-screen App
       ├── 📜 Main Viewer (상단/중앙) : 진행 과정 트리 (캐시 일치 여부 표시 포함), 에이전트 산출물, 최종 파일 반영 보고서 출력 뷰어
-      ├── ⌨️ Input Prompt (하단) : 상시 활성화된 사용자 대화 및 지시어 입력창 (r: 초기화, q: 종료 명령 지원)
+      ├── ⌨️ Input Prompt (하단) : 상시 활성화된 사용자 대화 및 지시어 입력창 (r: 초기화, u: 위키 배포, q: 종료 명령 지원)
       └── ⚡ Event Handler : 'q', 'Ctrl+C' 즉시 종료 글로벌 바인딩
 
 [ ADK Core Layer (Python) ]
@@ -26,7 +26,7 @@
 ## 2. 워크플로우 시퀀스 (Interactive Loop)
 
 1. 사용자가 현재 타겟 경로에서 `arti-ops` 명령어 실행 ➔ 터미널 전체화면 TUI 앱 진입.
-2. 하단 프롬프트에 지시 입력 (예: `"r"` 입력 시 즉시 세션 DB 파기 및 초기화).
+2. 하단 프롬프트에 지시 입력 (예: `"r"` 입력 시 세션 초기화, `"u"` 입력 시 로컬 에셋 위키 배포 다이얼로그 노출).
 3. **Profiler**가 로컬 파일 컨텍스트와 BookStack 정책을 수집. 단, 직전 대화 혹은 저장된 `sessions.db`의 컨텍스트로 충분하다고 LLM이 판단한 경우, 도구 호출을 생략하고 캐시 히트(Cache Hit) 메시지(`💡 이전 세션(sessions.db) 기억을 불러왔습니다.`)를 시각적으로 노출한다.
 4. **Architect**가 지시와 컨텍스트를 바탕으로 `.agents/skills/...` 및 `.agents/rules/...` 규격에 맞춰 내용 기획 및 생성. 실시간 스트림 파싱을 통해 타겟 파일의 경로를 렌더링한다.
 5. **Verifier**가 무결성 검증 후, TUI 화면에 **[반영 예정 파일 목록 및 상세 내용 요약 보고서]**를 제출하고 파이프라인 대기 상태 전환.
@@ -54,7 +54,7 @@ box "Python ADK Pipeline" #F8FAFC
 end box
 
 == 1. 파이프라인 초기화 및 캐시 히트 (Context Sync) ==
-User -> CLI : `uv run arti-ops` 및\n자연어 프롬프트 지시 입력\n(r 누를 시 세션 DB 즉각 파기)
+User -> CLI : `uv run arti-ops` 및\n자연어 프롬프트 지시 입력\n(r: 세션 파기, u: 대화형 위키 배포)
 activate CLI
 CLI -> Profiler : 환경 및 정책 수집 지시
 activate Profiler

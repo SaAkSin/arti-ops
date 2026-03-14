@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 ### Added
+- `list_viewer.py` 모듈 신규 추가 및 `l` (list) 명령어 전면 고도화: 텍스트 출력을 넘어 좌우 분할(Split) 방식의 전체화면 대화형 TUI 뷰어를 구현, 방향키(`↑`/`↓`) 목록 탐색 및 스페이스바(`Space`) 파일 내용 미리보기 기능 지원
+- `u` (upsert) 명령어를 통한 로컬 에셋(규칙, 스킬)의 BookStack 대화형 동기화 기능 추가 (체크박스 다이얼로그 지원)
 - 대화형 TUI 환경(Native IME 기반) 도입 및 `rich`, `prompt_toolkit` 마이그레이션 적용
 - `r` (reset) 명령어를 통한 `sessions.db` 캐시 명시적 초기화 기능 추가
 - 이전 컨텍스트 재사용 시 `💡 이전 세션(sessions.db) 기억을 불러왔습니다.` 형태의 캐시 히트 메시지 시각화

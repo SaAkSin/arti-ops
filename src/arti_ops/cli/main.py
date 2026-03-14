@@ -12,11 +12,13 @@ from rich.tree import Tree
 from rich.live import Live
 
 from prompt_toolkit import PromptSession
-from prompt_toolkit.shortcuts import clear
+from prompt_toolkit.shortcuts import clear, checkboxlist_dialog
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.styles import Style
 
 from ..core.pipeline import ArtiOpsPipeline
+from ..tools.bookstack import BookStackToolset
+from .list_viewer import run_list_viewer
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
     ))
 
     session = PromptSession(
-        bottom_toolbar=lambda: " [q: 즉시 종료 / r: 세션 초기화 / Ctrl+C: 취소] 지시사항을 자연어로 입력하세요.",
+        bottom_toolbar=lambda: " [q: 즉시 종료 / r: 세션 초기화 / u: 위키 수동 배포 / l: 로컬 상태 조회 / Ctrl+C: 취소] 지시사항을 자연어로 입력하세요.",
         style=pt_style
     )
 
@@ -71,6 +73,59 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                 # 파이프라인 및 세션 서비스 즉시 재생성
                 pipeline = ArtiOpsPipeline(target_project_id=workspace)
                 console.print("\n[bold yellow]🔄 sessions.db 캐시가 초기화되었습니다. 완전히 백지 상태에서 새로 시작합니다![/bold yellow]")
+                continue
+                
+            # BookStack Upsert 동기화
+            if user_input.lower() in ['u', 'upsert']:
+                console.print("\n[cyan]🔄 로컬 룰/스킬 데이터를 BookStack과 동기화하기 위한 계획을 분석 중입니다...[/cyan]")
+                bookstack = BookStackToolset()
+                plan = await bookstack.get_upsert_plan(workspace)
+                
+                if not plan:
+                    console.print("[yellow]동기화할 수 있는 로컬(L3) 에셋(규칙, 스킬)을 찾을 수 없거나 BookStack 챕터 오류입니다.[/yellow]")
+                    continue
+                
+                choices = [
+                    (item, f"[{item['action']}] {item['rel_path']}")
+                    for item in plan
+                ]
+                
+                selected_plan = await asyncio.to_thread(
+                    checkboxlist_dialog(
+                        title="위키 연동 (BookStack Upsert)",
+                        text="방향키(↑/↓)와 스페이스바(Space)로 배포할 항목을 선택하거나 해제하세요.\n선택된 항목들만 BookStack에 전송되어 병합됩니다.",
+                        values=choices,
+                        style=pt_style
+                    ).run
+                )
+                
+                if not selected_plan:
+                    console.print("\n[dim]배포가 취소되었습니다. 선택된 항목이 없습니다.[/dim]")
+                    continue
+                    
+                console.print(f"\n[bold green]🚀 {len(selected_plan)}개의 항목을 대상 BookStack 워크스페이스에 배포합니다...[/bold green]")
+                await bookstack.execute_upsert(selected_plan)
+                console.print("[bold cyan]✅ 로컬-위키 연동이 성공적으로 완료되었습니다![/bold cyan]")
+                continue
+                
+            # Local Asset List 조회
+            if user_input.lower() in ['l', 'list']:
+                base_dir = os.path.join(os.getcwd(), ".agents")
+                if not os.path.exists(base_dir):
+                    console.print("\n[yellow]📂 현재 로컬에 수집/배포된 룰이나 스킬이 없습니다. (.agents 폴더 없음)[/yellow]")
+                    continue
+                
+                console.print("\n[cyan]🔄 BookStack 위키와 로컬 현황을 비교 분석 중입니다...[/cyan]")
+                bookstack = BookStackToolset()
+                plan = await bookstack.get_upsert_plan(workspace)
+                
+                # 룩업 딕셔너리 생성 (rel_path: action)
+                plan_lookup = {item["rel_path"]: item["action"] for item in plan}
+                
+                # 대화형 List Viewer 실행
+                await run_list_viewer(plan_lookup, base_dir)
+                
+                console.print("\n[bold cyan]✅ 로컬 현황 조회를 완료했습니다.[/bold cyan]")
                 continue
                 
             if not user_input:

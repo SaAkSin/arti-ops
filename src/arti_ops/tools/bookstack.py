@@ -187,3 +187,124 @@ class BookStackToolset(BaseToolset):
             except Exception as e:
                 return f"Error publishing sync report: {str(e)}"
 
+    async def get_upsert_plan(self, project_id: str) -> list[dict]:
+        """로컬 .agents 데이터를 스캔하고 BookStack과 비교하여 배포 계획을 생성합니다."""
+        plan = []
+        book_slug = f"workspace-{project_id}"
+        
+        async with httpx.AsyncClient() as client:
+            headers = self.get_headers()
+            try:
+                # 1. 대상 책(Book) ID 조회
+                books_url = f"{self.api_url}/books"
+                books_res = await client.get(books_url, headers=headers, params={"filter[slug]": book_slug})
+                books_res.raise_for_status()
+                books_data = books_res.json().get("data", [])
+                
+                if not books_data:
+                    logger.error(f"Book not found for slug '{book_slug}'")
+                    return plan
+                book_id = books_data[0]["id"]
+                
+                # 2. 책 상세 정보 조회 (하위 챕터 획득)
+                book_detail_url = f"{self.api_url}/books/{book_id}"
+                book_detail_res = await client.get(book_detail_url, headers=headers)
+                book_detail_res.raise_for_status()
+                contents = book_detail_res.json().get("contents", [])
+                
+                chapters = {
+                    "rules": next((c for c in contents if c.get("type") == "chapter" and c.get("slug") == "rules"), None),
+                    "skills": next((c for c in contents if c.get("type") == "chapter" and c.get("slug") == "skills"), None)
+                }
+
+                # 3. 로컬 파일 스캔 및 비교
+                base_dir = os.path.join(os.getcwd(), ".agents")
+                targets = [
+                    ("rules", os.path.join(base_dir, "rules")),
+                    ("skills", os.path.join(base_dir, "skills"))
+                ]
+                
+                for target_type, target_dir in targets:
+                    chapter = chapters.get(target_type)
+                    if not chapter:
+                        logger.warning(f"No {target_type} chapter found in {book_slug}.")
+                        continue
+                        
+                    chapter_id = chapter["id"]
+                    existing_pages = {p["name"]: p["id"] for p in chapter.get("pages", [])}
+                    
+                    if not os.path.exists(target_dir):
+                        continue
+                        
+                    if target_type == "rules":
+                        for filename in os.listdir(target_dir):
+                            if filename.endswith(".md"):
+                                page_name = filename[:-3]
+                                local_path = os.path.join(target_dir, filename)
+                                rel_path = f".agents/rules/{filename}"
+                                with open(local_path, "r", encoding="utf-8") as f:
+                                    content = f.read()
+                                
+                                page_id = existing_pages.get(page_name)
+                                action = "Update" if page_id else "Create"
+                                plan.append({
+                                    "name": page_name,
+                                    "type": target_type,
+                                    "rel_path": rel_path,
+                                    "content": content,
+                                    "action": action,
+                                    "chapter_id": chapter_id,
+                                    "page_id": page_id
+                                })
+                    elif target_type == "skills":
+                        for skill_name in os.listdir(target_dir):
+                            skill_dir = os.path.join(target_dir, skill_name)
+                            if os.path.isdir(skill_dir):
+                                skill_file = os.path.join(skill_dir, "SKILL.md")
+                                if os.path.exists(skill_file):
+                                    rel_path = f".agents/skills/{skill_name}/SKILL.md"
+                                    with open(skill_file, "r", encoding="utf-8") as f:
+                                        content = f.read()
+                                        
+                                    page_name = skill_name
+                                    page_id = existing_pages.get(page_name)
+                                    action = "Update" if page_id else "Create"
+                                    plan.append({
+                                        "name": page_name,
+                                        "type": target_type,
+                                        "rel_path": rel_path,
+                                        "content": content,
+                                        "action": action,
+                                        "chapter_id": chapter_id,
+                                        "page_id": page_id
+                                    })
+            except Exception as e:
+                logger.error(f"Error generating upsert plan: {e}")
+                
+        return plan
+
+    async def execute_upsert(self, plan: list[dict]) -> None:
+        """선택된 배포 계획을 실제로 BookStack에 작성합니다."""
+        async with httpx.AsyncClient() as client:
+            headers = self.get_headers()
+            
+            for item in plan:
+                try:
+                    payload = {
+                        "name": item["name"],
+                        "markdown": item["content"],
+                        "chapter_id": item["chapter_id"]
+                    }
+                    if item["action"] == "Create":
+                        url = f"{self.api_url}/pages"
+                        res = await client.post(url, headers=headers, json=payload)
+                        res.raise_for_status()
+                        logger.info(f"Created page: {item['name']}")
+                    elif item["action"] == "Update":
+                        url = f"{self.api_url}/pages/{item['page_id']}"
+                        res = await client.put(url, headers=headers, json=payload)
+                        res.raise_for_status()
+                        logger.info(f"Updated page: {item['name']}")
+                except Exception as e:
+                    logger.error(f"Failed to {item['action']} page {item['name']}: {e}")
+
