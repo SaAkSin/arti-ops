@@ -23,6 +23,7 @@ async def run_list_viewer(plan_lookup, base_dir):
         for filename in sorted(os.listdir(rules_dir)):
             if filename.endswith(".md"):
                 rel_path = f".agents/rules/{filename}"
+                badge = "  "
                 if action := plan_lookup.get(rel_path):
                     if action == "Create": badge = "! "
                     elif action == "Update": badge = "* "
@@ -43,12 +44,23 @@ async def run_list_viewer(plan_lookup, base_dir):
                 skill_file = os.path.join(skill_path, "SKILL.md")
                 if os.path.exists(skill_file):
                     rel_path = f".agents/skills/{dirname}/SKILL.md"
+                    badge = "  "
                     if action := plan_lookup.get(rel_path):
                         if action == "Create": badge = "! "
                         elif action == "Update": badge = "* "
                         elif action == "Match": badge = "  "
-                    display_text = f"  {badge}{dirname} (/SKILL.md)"
+                    display_text = f"  {badge}{dirname} (SKILL.md)"
                     items.append((display_text, skill_file))
+                    
+                    # 스크립트 등 부속 파일 탐색
+                    for root, dirs, files in os.walk(skill_path):
+                        for file in sorted(files):
+                            if file == "SKILL.md" or file.startswith("."):
+                                continue
+                            
+                            sub_path = os.path.join(root, file)
+                            rel_sub = os.path.relpath(sub_path, skill_path)
+                            items.append((f"      ↳ {rel_sub}", sub_path))
                 else:
                     items.append((f"  {dirname} (SKILL.md 누락)", None))
 
