@@ -19,7 +19,7 @@ async def run_list_viewer(plan_lookup, base_dir):
     
     rules_dir = os.path.join(base_dir, "rules")
     if os.path.exists(rules_dir):
-        items.append(("📜 Rules:", None))
+        items.append(("● Rules:", None))
         for filename in sorted(os.listdir(rules_dir)):
             if filename.endswith(".md"):
                 rel_path = f".agents/rules/{filename}"
@@ -35,7 +35,7 @@ async def run_list_viewer(plan_lookup, base_dir):
     if os.path.exists(skills_dir):
         if items:
             items.append(("", None)) # 공백
-        items.append(("🛠️ Skills:", None))
+        items.append(("◆ Skills:", None))
         for dirname in sorted(os.listdir(skills_dir)):
             skill_path = os.path.join(skills_dir, dirname)
             if os.path.isdir(skill_path):

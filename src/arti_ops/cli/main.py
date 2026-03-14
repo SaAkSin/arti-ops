@@ -37,7 +37,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
     # 1. 화면 정리 및 환영 메시지
     clear()
     console.print(Panel(
-        f"[bold green]🚀 Target Workspace: '{workspace}' / Agent: '{target_agent}'[/bold green]\n"
+        f"[bold green]▶ Target Workspace: '{workspace}' / Agent: '{target_agent}'[/bold green]\n"
         "[dim]명령어가 실행된 현재 디렉토리와 BookStack 정책을 분석하여 AI 스킬/룰을 자동 생성합니다.\n"
         "종료하려면 프롬프트에서 'q'를 입력하거나 Ctrl+C를 누르세요.[/dim]",
         title="arti-ops v0.5.0", border_style="blue"
@@ -52,13 +52,13 @@ async def run_interactive_loop(workspace: str, target_agent: str):
         try:
             # 2. 하단 프롬프트 입력 대기
             with patch_stdout():
-                user_input = await session.prompt_async("\n📝 프롬프트 지시 ❯ ")
+                user_input = await session.prompt_async("\n■ 프롬프트 지시 ❯ ")
                 
             user_input = user_input.strip()
             
             # Kill-switch (즉시 종료)
             if user_input.lower() in ['q', 'quit', 'exit']:
-                console.print("\n[bold red]👋 프로그램을 즉시 종료합니다.[/bold red]")
+                console.print("\n[bold red]■ 프로그램을 즉시 종료합니다.[/bold red]")
                 sys.exit(0)
             
             # Session DB Cache Reset (캐시 초기화)
@@ -77,12 +77,12 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                 
             # BookStack Upsert 동기화
             if user_input.lower() in ['u', 'upsert']:
-                console.print("\n[cyan]🔄 로컬 룰/스킬 데이터를 BookStack과 동기화하기 위한 계획을 분석 중입니다...[/cyan]")
                 bookstack = BookStackToolset()
-                plan = await bookstack.get_upsert_plan(workspace)
+                with console.status("[cyan]BookStack 위키와 로컬 현황을 비교 분석 중입니다...[/cyan]", spinner="dots"):
+                    plan = await bookstack.get_upsert_plan(workspace)
                 
                 if not plan:
-                    console.print("[yellow]동기화할 수 있는 로컬(L3) 에셋(규칙, 스킬)을 찾을 수 없거나 BookStack 챕터 오류입니다.[/yellow]")
+                    console.print("[yellow]▼ 동기화할 수 있는 로컬(L3) 에셋(규칙, 스킬)을 찾을 수 없거나 BookStack 챕터 오류입니다.[/yellow]")
                     continue
                 
                 choices = [
@@ -103,21 +103,21 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     console.print("\n[dim]배포가 취소되었습니다. 선택된 항목이 없습니다.[/dim]")
                     continue
                     
-                console.print(f"\n[bold green]🚀 {len(selected_plan)}개의 항목을 대상 BookStack 워크스페이스에 배포합니다...[/bold green]")
-                await bookstack.execute_upsert(selected_plan)
-                console.print("[bold cyan]✅ 로컬-위키 연동이 성공적으로 완료되었습니다![/bold cyan]")
+                with console.status(f"[bold green]▶ {len(selected_plan)}개의 항목을 대상 BookStack 워크스페이스에 배포합니다...[/bold green]", spinner="dots"):
+                    await bookstack.execute_upsert(selected_plan)
+                console.print("[bold cyan]√ 로컬-위키 연동이 성공적으로 완료되었습니다![/bold cyan]")
                 continue
                 
             # Local Asset List 조회
             if user_input.lower() in ['l', 'list']:
                 base_dir = os.path.join(os.getcwd(), ".agents")
                 if not os.path.exists(base_dir):
-                    console.print("\n[yellow]📂 현재 로컬에 수집/배포된 룰이나 스킬이 없습니다. (.agents 폴더 없음)[/yellow]")
+                    console.print("\n[yellow]▼ 현재 로컬에 수집/배포된 룰이나 스킬이 없습니다. (.agents 폴더 없음)[/yellow]")
                     continue
                 
-                console.print("\n[cyan]🔄 BookStack 위키와 로컬 현황을 비교 분석 중입니다...[/cyan]")
                 bookstack = BookStackToolset()
-                plan = await bookstack.get_upsert_plan(workspace)
+                with console.status("[cyan]BookStack 위키와 로컬 현황을 비교 분석 중입니다...[/cyan]", spinner="dots"):
+                    plan = await bookstack.get_upsert_plan(workspace)
                 
                 # 룩업 딕셔너리 생성 (rel_path: action)
                 plan_lookup = {item["rel_path"]: item["action"] for item in plan}
@@ -125,7 +125,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                 # 대화형 List Viewer 실행
                 await run_list_viewer(plan_lookup, base_dir)
                 
-                console.print("\n[bold cyan]✅ 로컬 현황 조회를 완료했습니다.[/bold cyan]")
+                console.print("\n[bold cyan]√ 로컬 현황 조회를 완료했습니다.[/bold cyan]")
                 continue
                 
             if not user_input:
@@ -141,7 +141,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
             )
 
             # 3. 라이브 상태 트리 준비
-            main_tree = Tree(f"🔄 파이프라인 진행 상태")
+            main_tree = Tree(f"◎ 파이프라인 진행 상태")
             nodes = {}
             agents_info = [
                 ("context_profiler", "Context Profiler"), 
@@ -246,28 +246,28 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                                 live.stop() # 화면 깨짐 방지를 위해 트리 렌더링 일시 중지
                                 
                                 console.print("\n")
-                                console.print(Panel(Markdown(event.get("report", "내용 없음")), title="📄 [최종 반영 검토 보고서]", border_style="yellow"))
-                                console.print("[bold yellow]🔔 위 산출물을 확인하고 승인(Y) 하거나 수정 지시를 입력하세요.[/bold yellow]")
+                                console.print(Panel(Markdown(event.get("report", "내용 없음")), title="≡ [최종 반영 검토 보고서]", border_style="yellow"))
+                                console.print("[bold yellow]❖ 위 산출물을 확인하고 승인(Y) 하거나 수정 지시를 입력하세요.[/bold yellow]")
                                 
                                 while True:
                                     with patch_stdout():
-                                        sub_input = await session.prompt_async("📝 승인(Y) / 반려(N) / 수정 요청 ❯ ")
+                                        sub_input = await session.prompt_async("■ 승인(Y) / 반려(N) / 수정 요청 ❯ ")
                                     sub_input = sub_input.strip()
                                     
                                     if sub_input.lower() in ['q', 'quit']:
                                         animator_task.cancel()
-                                        console.print("\n[bold red]👋 프로그램을 즉시 종료합니다.[/bold red]")
+                                        console.print("\n[bold red]■ 프로그램을 즉시 종료합니다.[/bold red]")
                                         sys.exit(0)
                                     elif sub_input.lower() in ['y', 'yes', '승인', 'ㅇㅇ', '']:
-                                        console.print("\n[bold green]✅ 승인 완료. 로컬 배포 및 GWS 요약 전송을 시작합니다.[/bold green]")
+                                        console.print("\n[bold green]√ 승인 완료. 로컬 배포 및 GWS 요약 전송을 시작합니다.[/bold green]")
                                         await pipeline.resume(session_id, {"approved": True})
                                         break
                                     elif sub_input.lower() in ['n', 'no', '반려', '거절', '취소']:
-                                        console.print("\n[bold red]❌ 승인 거절. 초기 프롬프트로 돌아갑니다.[/bold red]")
+                                        console.print("\n[bold red]X 승인 거절. 초기 프롬프트로 돌아갑니다.[/bold red]")
                                         await pipeline.resume(session_id, {"approved": False, "feedback": "사용자가 반려했습니다."})
                                         break
                                     else:
-                                        console.print(f"\n[bold magenta]💬 피드백 전달 완료. 요구사항을 반영하여 재기획합니다...[/bold magenta]")
+                                        console.print(f"\n[bold magenta]▶ 피드백 전달 완료. 요구사항을 반영하여 재기획합니다...[/bold magenta]")
                                         # 트리 상태 초기화 후 재가동
                                         for key, name in agents_info:
                                             nodes[key].label = f"[dim]{name}[/dim]"
