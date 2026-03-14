@@ -24,13 +24,10 @@ class ArtiOpsApp(App):
         border: solid green;
         padding: 1;
     }
-    Input {
-        dock: bottom;
-        margin: 1 2;
-    }
     """
     
     BINDINGS = [
+        Binding("i", "input_command", "명령어/피드백 입력 (한글지원)", show=True),
         Binding("q", "quit", "종료", show=True),
         Binding("ctrl+c", "quit", "종료", show=True),
     ]
@@ -47,37 +44,46 @@ class ArtiOpsApp(App):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield RichLog(id="main_log", markup=True, wrap=True)
-        yield Input(placeholder="명령어나 힌트를 입력하세요 ('q' 입력 시 즉시 종료)", id="prompt_input")
         yield Footer()
 
     async def on_mount(self) -> None:
         log = self.query_one(RichLog)
         log.write(f"[bold green]🚀 Target Workspace: '{self.workspace}' / Agent: '{self.target_agent}' 로컬 컨텍스트 융합 TUI 앱에 오신 것을 환영합니다.[/bold green]")
-        log.write("[italic]하단 프롬프트에 지시를 입력하여 에이전트 파이프라인을 가동하세요. (예: '현재 프로젝트 구조를 참고해서 DB 연동 스킬을 만들어줘')[/italic]")
-        
-        self.query_one(Input).focus()
+        log.write("[italic]하단 단축키(i)를 눌러 프롬프트 창을 띄운 후 지시를 입력하세요. (예: '현재 프로젝트 구조를 참고해서 DB 연동 스킬을 만들어줘')[/italic]")
 
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        user_input = event.value.strip()
-        input_widget = self.query_one(Input)
-        input_widget.value = ""
-        
-        if user_input.lower() == "q":
-            self.exit()
-            return
-            
-        if not user_input:
-            return
+    async def action_input_command(self) -> None:
+        """한글 입력 깨짐 방지를 위해 TUI를 잠시 내리고 기본 터미널 입력(Native IME)을 받습니다."""
+        with self.suspend():
+            print("\n=======================================================")
+            print("[ TUI 임시 중단 - 자연어 명령어/피드백 입력 모드 ]")
+            print("=======================================================")
+            print("💡 한글 정상 입력을 위해 터미널 기본 모드로 진입했습니다.")
+            print("   - 피드백이나 지시사항을 자유롭게 한글로 입력하세요.")
+            print("   - 내용 없이 [Enter]만 누르면 TUI 화면으로 복귀합니다.")
+            print("   - 'q' 입력 시 앱이 완전히 종료됩니다.")
+            print("-------------------------------------------------------\n")
+            try:
+                user_input = input("📝 프롬프트 ❯ ")
+            except EOFError:
+                user_input = ""
+                
+        user_input = user_input.strip()
+        if user_input:
+            if user_input.lower() == 'q':
+                self.exit()
+                return
+            await self._process_input(user_input)
 
+    async def _process_input(self, user_input: str) -> None:
         log = self.query_one(RichLog)
         
         if self.is_waiting_for_approval:
             # 피드백 또는 승인 처리 (Self-Correction 루프)
-            if user_input.lower() in ['y', 'yes', '승인', 'yep']:
+            if user_input.lower() in ['y', 'yes', '승인', 'yep', 'ㅇㅇ']:
                 log.write("\n[bold green]✅ 승인 완료. Executor(샌드박스/파일 배포) 단계를 가동합니다.[/bold green]\n")
                 self.is_waiting_for_approval = False
                 await self.pipeline.resume(self.session_id, {"approved": True})
-            elif user_input.lower() in ['n', 'no', '반려', '거절']:
+            elif user_input.lower() in ['n', 'no', '반려', '거절', 'ㄴㄴ']:
                 log.write("\n[bold red]❌ 배포 단순 취소. 파이프라인을 종료합니다.[/bold red]\n")
                 self.is_waiting_for_approval = False
                 await self.pipeline.resume(self.session_id, {"approved": False, "feedback": "사용자가 TUI에서 수동으로 승인을 반려했습니다."})
