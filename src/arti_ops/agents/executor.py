@@ -16,6 +16,7 @@ def get_executor_agent(tools: list = None) -> Agent:
        - 반드시 제공된 `FileIOToolset`의 `write_file` 도구를 명시적으로 호출하여 로컬 호스트에 물리적인 쓰기 작업을 수행해야 합니다.
        - 파일의 상대 경로는 기획안에 따라 `rules/파일명.md` 또는 `skills/파일명.py` 규격으로 전달하십시오. 필요 시 파일 개수만큼 도구를 여러 번 호출하세요.
     3. **역 동기화 (Sync-back)**: 파일 배포가 성공적으로 완료되면, `BookStackToolset`의 `publish_sync_report` 툴을 호출하여 이번 배포 내역(Diff)을 위키(Release Notes)에 업데이트 하세요.
+    4. **최종 보고 (GWS Summary)**: 🚨 모든 로컬 파일 쓰기 및 BookStack 역동기화 작업이 성공적으로 종료되면, 파이프라인을 마치기 전 가장 마지막 단계로 반드시 `send_summary` 도구를 호출하십시오. 적용된 변경 사항들을 짧게 요약하여 GWS 채팅방으로 최종 성공 보고(알림)를 전송해야 합니다.
     """
 
     return Agent(

@@ -16,6 +16,7 @@ class GwsChatTool(LongRunningFunctionTool):
     
     def __init__(self, **data):
         super().__init__(func=self.run, **data)
+        self.pause_requested = False  # 🚨 파이프라인용 상태 플래그 추가
         
     @property
     def gws_space_id(self) -> str:
@@ -60,6 +61,44 @@ class GwsChatTool(LongRunningFunctionTool):
 
         except Exception as e:
             logger.exception(f"gws cli 호출 중 에러 발생: {e}")
+            
+    async def send_summary(self, project_id: str, summary: str) -> str:
+        """
+        파이프라인의 배포가 모두 완료된 후 가장 마지막에 호출되는 단순 알림용(Non-blocking) 메서드입니다.
+        Yield(Pause)를 발생시키지 않기 위해 일반 문자열을 반환합니다.
+        """
+        if not self.gws_space_id:
+            logger.warning("GWS_SPACE_ID is not set. Skipped summary webhook.")
+            return "Skipped (No GWS_SPACE_ID)"
+
+        message_body = (
+            f"✅ *arti-ops 배포 완료 요약* [{project_id}]\n\n"
+            f"---\n{summary}\n---"
+        )
+        
+        try:
+            env = os.environ.copy()
+            process = await asyncio.create_subprocess_exec(
+                "gws", "chat", "+send",
+                "--space", self.gws_space_id,
+                "--text", message_body,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env
+            )
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode == 0:
+                logger.info(f"[{project_id}] 배포 요약 GWS 전송 완료.")
+                return f"Summary sent successfully to GWS space: {self.gws_space_id}"
+            else:
+                err_msg = stderr.decode('utf-8')
+                logger.error(f"[{project_id}] 배포 요약 발송 실패: {err_msg}")
+                return f"Failed to send summary: {err_msg}"
+                
+        except Exception as e:
+            logger.exception(f"gws summary 발송 중 에러 발생: {e}")
+            return f"Error occurred: {str(e)}"
     
     # Run은 LongRunningFunctionTool의 표준 호출 메서드를 재정의 또는 확장에 사용
     async def run(self, project_id: str, diff_md: str, conflict_reason: str) -> Dict[str, Any]:
@@ -67,6 +106,8 @@ class GwsChatTool(LongRunningFunctionTool):
         이 메서드가 호출되면 LongRunningFunctionTool의 특성에 의해 파이프라인이 즉시 일시정지(Yield)됩니다.
         호출 전에 gws CLI를 통해 승인 요청 메시지를 보냅니다.
         """
+        self.pause_requested = True   # 🚨 툴이 호출되었음을 마킹
+        
         await self.request_approval(project_id, diff_md, conflict_reason)
         # return 한 내용은 Runner 쪽에서 일시 정지(Pause) 이벤트를 식별하는 데이터로 활용됩니다.
         return {
