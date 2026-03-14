@@ -40,10 +40,11 @@ class ArtiOpsPipeline:
         self.verifier = get_verifier_agent(tools=[])
         self.executor = get_executor_agent(tools=[self.file_io_tool, self.bookstack_tool, send_summary_tool])
         
-        # 세션 서비스 설정
-        db_dir = os.path.join(os.path.expanduser("~"), ".arti-ops", self.target_project_id)
-        os.makedirs(db_dir, exist_ok=True)
-        self.session_service = SqliteSessionService(db_path=os.path.join(db_dir, "sessions.db"))
+        from arti_ops.config import Configurator
+        config = Configurator.get_instance()
+        # 세션 서비스 설정: Global DB 사용 (session_id 로 구분됨)
+        db_path = str(os.path.expanduser("~/.arti-ops/arti_ops_session.db"))
+        self.session_service = SqliteSessionService(db_path=db_path)
         
         self._pause_event = asyncio.Event()
         self._is_approved = False

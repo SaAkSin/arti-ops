@@ -5,6 +5,7 @@ import asyncio
 from typing import Optional, Dict, Any
 from google.adk.tools import BaseTool, FunctionTool
 from google.adk.tools.base_toolset import BaseToolset
+from arti_ops.config import get_config
 
 logger = logging.getLogger(__name__)
 from pydantic import ConfigDict, Field
@@ -23,9 +24,9 @@ class BookStackToolset(BaseToolset):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.api_url = os.getenv("BOOKSTACK_API_URL", "")
-        self.token_id = os.getenv("BOOKSTACK_TOKEN_ID", "")
-        self.token_secret = os.getenv("BOOKSTACK_TOKEN_SECRET", "")
+        self.api_url = get_config("BOOKSTACK_API_URL", "")
+        self.token_id = get_config("BOOKSTACK_TOKEN_ID", "")
+        self.token_secret = get_config("BOOKSTACK_TOKEN_SECRET", "")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     

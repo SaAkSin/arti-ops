@@ -2,7 +2,9 @@ import os
 import sys
 import asyncio
 import logging
-from dotenv import load_dotenv
+import sqlite3
+import shutil
+from pathlib import Path
 
 from cyclopts import App as CycloptsApp
 from rich.console import Console
@@ -19,6 +21,7 @@ from prompt_toolkit.styles import Style
 from ..core.pipeline import ArtiOpsPipeline
 from ..tools.bookstack import BookStackToolset
 from .list_viewer import run_list_viewer
+from arti_ops.config import Configurator
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +74,17 @@ async def run_interactive_loop(workspace: str, target_agent: str):
             
             # Session DB Cache Reset (캐시 초기화)
             if user_input.lower() in ['r', 'reset']:
-                db_path = os.path.join(os.path.expanduser("~"), ".arti-ops", workspace, "sessions.db")
+                db_path = os.path.expanduser("~/.arti-ops/arti_ops_session.db")
                 if os.path.exists(db_path):
                     try:
-                        os.remove(db_path)
+                        conn = sqlite3.connect(db_path)
+                        cursor = conn.cursor()
+                        # session_id 에 workspace가 포함된 모든 세션 삭제
+                        cursor.execute("DELETE FROM sessions WHERE session_id LIKE ?", (f"%{workspace}%",))
+                        conn.commit()
+                        conn.close()
                     except Exception as e:
-                        logger.error(f"Failed to remove db: {e}")
+                        logger.error(f"Failed to reset session in DB: {e}")
                 
                 # 파이프라인 및 세션 서비스 즉시 재생성
                 pipeline = ArtiOpsPipeline(target_project_id=workspace)
@@ -308,19 +316,72 @@ async def run_interactive_loop(workspace: str, target_agent: str):
             console.print(f"\n[bold red]❌ 에러 발생: {e}[/bold red]")
 
 
+@app.command
+def init():
+    """
+    arti-ops 를 전역적으로 사용하기 위한 글로벌(+로컬) 환경을 스캐폴딩(초기화)합니다.
+    """
+    console.print(Panel("[bold cyan]arti-ops 초기화 마법사[/bold cyan]"))
+    
+    # 1. 로컬 디렉토리 스캐폴딩
+    Path(".agents/rules").mkdir(parents=True, exist_ok=True)
+    Path(".agents/skills").mkdir(parents=True, exist_ok=True)
+    console.print("┣ [green]로컬 폴더 생성 완료:[/green] .agents/rules, .agents/skills")
+    
+    # 2. 로컬 설정 (.artiops.toml) 작성
+    local_conf = Path(".artiops.toml")
+    if not local_conf.exists():
+        current_dir = Path.cwd().name
+        with open(local_conf, "w") as f:
+            f.write(f'current_project_id = "{current_dir}"\n')
+        console.print(f"┣ [green]로컬 식별자 생성 완료:[/green] .artiops.toml (project_id='{current_dir}')")
+    
+    # 3. 글로벌 설정 프롬프트
+    home_dir = Path.home() / ".arti-ops"
+    home_dir.mkdir(parents=True, exist_ok=True)
+    
+    cred_file = home_dir / "credentials"
+    if not cred_file.exists():
+        console.print("┣ [dim]글로벌 인증 정보가 없습니다 (처음 1회만 입력).[/dim]")
+        try:
+            from prompt_toolkit import prompt
+            gemini_key = prompt("┃ ❯ Gemini API KeY: ", is_password=True).strip()
+            bs_url = prompt("┃ ❯ BookStack API URL (ex: https://wiki.ok.com/api): ").strip()
+            bs_id = prompt("┃ ❯ BookStack Token ID: ").strip()
+            bs_secret = prompt("┃ ❯ BookStack Token Secret (pwd): ", is_password=True).strip()
+            use_gws = prompt("┃ ❯ USE GWS CLI(y/n)? [n]: ").strip().lower() == 'y'
+            
+            with open(cred_file, "w") as f:
+                f.write("[default]\n")
+                f.write(f"GEMINI_API_KEY={gemini_key}\n")
+                f.write("GEMINI_MODEL_PRO=gemini-2.5-pro\n")
+                f.write("GEMINI_MODEL_FLASH=gemini-2.5-flash\n")
+                f.write(f"BOOKSTACK_API_URL={bs_url}\n")
+                f.write(f"BOOKSTACK_TOKEN_ID={bs_id}\n")
+                f.write(f"BOOKSTACK_TOKEN_SECRET={bs_secret}\n")
+                f.write(f"USE_GWS_CLI={'true' if use_gws else 'false'}\n")
+            console.print("┣ [green]글로벌 인증 저장 완료:[/green] ~/.arti-ops/credentials")
+        except EOFError:
+            pass
+        except KeyboardInterrupt:
+            pass
+            
+    console.print("┗ [bold green]모든 준비가 완료되었습니다! 이제 `arti-ops` 명령어를 사용하세요.[/bold green]")
+
+
 @app.default
 def main_cli(workspace: str = None, agent: str = "antigravity"):
     """
     현재 경로와 BookStack 정책을 참조하여 에이전트 환경을 대화형으로 생성합니다.
     """
+    config = Configurator.get_instance()
+    
     if not workspace:
-        # 미입력 시 현재 명령어가 실행된 경로의 폴더명 추출
-        workspace = os.path.basename(os.path.abspath(os.getcwd()))
+        workspace = config.project_id or os.path.basename(os.path.abspath(os.getcwd()))
         
     asyncio.run(run_interactive_loop(workspace, agent))
 
 def main():
-    load_dotenv()
     os.makedirs("logs", exist_ok=True)
     logging.basicConfig(
         filename="logs/arti-ops-cli.log",

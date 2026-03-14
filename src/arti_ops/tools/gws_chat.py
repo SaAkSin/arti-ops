@@ -1,7 +1,11 @@
 import os
 import asyncio
 import logging
+import httpx
 from pydantic import ConfigDict
+from google.adk.tools import BaseTool, FunctionTool
+from google.adk.tools.base_toolset import BaseToolset
+from arti_ops.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -10,12 +14,13 @@ class GwsChatTool:
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
     @property
-    def gws_space_id(self) -> str:
-        return os.getenv("GWS_SPACE_ID", "")
+    def check_room_id(self) -> str:
+        """이 환경에서 사용되는 알림 룸 ID"""
+        return get_config("GWS_SPACE_ID", "")
 
     async def send_summary(self, project_id: str, summary: str) -> str:
         """최종 배포 후 요약 보고서를 GWS에 전송합니다."""
-        if not self.gws_space_id:
+        if not self.check_room_id:
             logger.warning("GWS_SPACE_ID is not set. Skipped summary webhook.")
             return "Skipped (No GWS_SPACE_ID)"
 

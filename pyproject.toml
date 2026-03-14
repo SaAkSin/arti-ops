@@ -14,7 +14,8 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "rich>=14.3.3",
     "cyclopts>=2.9.0",
-    "prompt_toolkit>=3.0.43"
+    "prompt_toolkit>=3.0.43",
+    "toml>=0.10.2"
 ]
 
 [project.scripts]

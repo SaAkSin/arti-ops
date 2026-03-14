@@ -1,5 +1,6 @@
 import os
-from google.adk import Agent
+from google.adk.agents import Agent
+from arti_ops.config import get_config
 
 def get_architect_agent(tools: list = None) -> Agent:
     instructions = """
@@ -30,4 +31,4 @@ def get_architect_agent(tools: list = None) -> Agent:
        4) **# Action Guidelines**: 에이전트가 수행할 구체적인 순서나 단계별 지침.
        5) **# Output Format (선택 사항)**: 특정 포맷 요구 시 예시 제공.
     """
-    return Agent(name="skill_architect", instruction=instructions, tools=tools or [], model=os.getenv("GEMINI_MODEL_PRO", "gemini-2.5-pro"))
+    return Agent(name="skill_architect", instruction=instructions, tools=tools or [], model=get_config("GEMINI_MODEL_PRO", "gemini-2.5-pro"))
