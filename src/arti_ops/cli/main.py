@@ -31,8 +31,8 @@ async def _run_pipeline(workspace: str, target_agent: str):
     try:
         command_prompt = (
             f"Target Workspace: `{workspace}` 에 대해 L1, L2 룰 및 스킬을 융합하세요.\n"
-            f"배포 대상 AI 에이전트는 `{target_agent}` 입니다.\n"
-            f"해당 에이전트가 환경을 완벽히 인식할 수 있도록 Rule과 Skill을 명확히 분리하여 배포를 기획하세요."
+            f"이 정책을 읽고 실행할 타겟 AI 에이전트는 `{target_agent}` 입니다.\n"
+            f"해당 에이전트가 완벽히 이해하고 동작할 수 있도록 Rule과 Skill 파일의 내용(Format)을 맞춤형으로 작성하되, 배포 경로는 반드시 표준 규격(.agents/rules/, .agents/skills/)을 엄격히 준수하여 기획하세요."
         )
         async for event in pipeline.run(command_prompt=command_prompt, session_id=session_id):
             
@@ -129,7 +129,7 @@ def sync(workspace: str = None, agent: str = "antigravity"):
     
     Args:
         workspace: 동기화할 타겟 프로젝트 ID. 누락 시 대화형 자동완성 프롬프트가 실행됩니다.
-        agent: 대상 AI 에이전트 (기본값: antigravity)
+        agent: 정책을 소비할 대상 AI 에이전트 이름 (기본값: antigravity)
     """
     # 워크스페이스 미입력 시 prompt_toolkit 자동완성 프롬프트 실행 (동기 컨텍스트)
     if not workspace:
