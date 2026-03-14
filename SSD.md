@@ -1,4 +1,4 @@
-# 🛠️ [SSD] arti-ops v0.1.0 시스템 및 서비스 명세서
+# 🛠️ [SSD] arti-ops v0.2.0 시스템 및 서비스 명세서
 
 ## 1. 시스템 아키텍처 개요 (System Architecture)
 
@@ -6,7 +6,7 @@ Pure Google ADK(Python)의 내장 객체들을 적극 활용하여 시스템을 
 
 ```text
 [ Client Layer (Local PC) ]
-  ├── 🖥️ Textual TUI (`arti-ops`) : Claude CLI 스타일의 마크다운 채팅(ChatBubble) 뷰어
+  ├── 🖥️ Interactive CLI (`arti-ops`) : Cyclopts + Rich 패널/스피너 + prompt_toolkit 기반 대화형 인터페이스
   └── 📂 Target Workspace : 최종 산출물이 병합될 `.agents/` 디렉토리
 
 [ ADK Core Layer (Python) ]
@@ -69,7 +69,7 @@ skinparam maxMessageSize 150
 skinparam ParticipantPadding 10
 
 actor "개발자/PM" as User #F9FAFB
-participant "Textual TUI\n(arti-ops CLI)" as CLI #E8F4F8
+participant "Interactive CLI\n(arti-ops)" as CLI #E8F4F8
 database "📚 BookStack API\n(SSOT)" as Wiki #FDEBD0
 
 box "Pure ADK Core (Python)" #F8FAFC
@@ -145,7 +145,7 @@ deactivate Executor
 
 ADK --> CLI : 최종 Event 스트림 종료
 deactivate ADK
-CLI --> User : ✅ TUI 화면에 최종 적용 결과 및 BookStack 링크 출력
+CLI --> User : ✅ CLI 패널에 최종 적용 결과 및 BookStack 링크 출력
 
 @enduml
 

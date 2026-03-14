@@ -32,7 +32,8 @@ echo "" >> "$OUTPUT_FILE"
 # 3. ^\.env(\..+)?$ : 환경 변수 데이터 유출 방지 (모든 .env 관련)
 # 4. .*\.lock : 거대한 패키지 락킹 파일 제외 (uv.lock, package-lock.json 등)
 # 5. \.(png|jpg|jpeg|gif|svg|ico|ttf|woff|woff2|eot|pdf|mp4|webm|zip|tar|gz|db|sqlite3)$ : 텍스트 이외의 정적 파일/DB 자산 제외
-EXCLUDE_PATTERN="^docs/|^\.agents/|^\.cursor/|^GEMINI\.md$|llms.*\.txt$|^\.env(\..+)?$|.*\.lock$|\.(png|jpeg|jpg|gif|svg|ico|ttf|woff|woff2|eot|pdf|mp4|webm|zip|tar|gz|db|sqlite|sqlite3)$"
+# 6. ^\.gitignore$ : 형상관리 설정 파일 제외
+EXCLUDE_PATTERN="^docs/|^\.agents/|^\.cursor/|^GEMINI\.md$|llms.*\.txt$|^\.env(\..+)?$|^\.gitignore$|.*\.lock$|\.(png|jpeg|jpg|gif|svg|ico|ttf|woff|woff2|eot|pdf|mp4|webm|zip|tar|gz|db|sqlite|sqlite3)$"
 
 echo "[Info] Gathering Git tracked files..."
 

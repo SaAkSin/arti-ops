@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.pyc
 
 # Environments
 .env
@@ -45,3 +44,4 @@ credentials/
 
 # Target Workspace (Local Sync Dir)
 .agents/
+src/arti_ops/__pycache__/__init__.cpython-310.pyc

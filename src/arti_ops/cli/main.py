@@ -16,9 +16,9 @@ from ..core.pipeline import ArtiOpsPipeline
 app = CycloptsApp(name="arti-ops", help="ADK 기반 다중 프로젝트 정책 병합 플랫폼 (대화형 CLI)")
 console = Console()
 
-async def _run_pipeline(workspace: str):
+async def _run_pipeline(workspace: str, target_agent: str):
     pipeline = ArtiOpsPipeline(target_project_id=workspace)
-    session_id = f"sess_{workspace}"
+    session_id = f"sess_{workspace}_{target_agent}"
     
     console.print(f"\n[bold green]� Target Workspace: '{workspace}' 정책 동기화 파이프라인 가동...[/bold green]\n")
     
@@ -29,7 +29,11 @@ async def _run_pipeline(workspace: str):
     status.start()
     
     try:
-        command_prompt = f"Target Workspace: `{workspace}` 에 대해 L1, L2 룰을 융합하고 배포를 시작하세요."
+        command_prompt = (
+            f"Target Workspace: `{workspace}` 에 대해 L1, L2 룰 및 스킬을 융합하세요.\n"
+            f"배포 대상 AI 에이전트는 `{target_agent}` 입니다.\n"
+            f"해당 에이전트가 환경을 완벽히 인식할 수 있도록 Rule과 Skill을 명확히 분리하여 배포를 기획하세요."
+        )
         async for event in pipeline.run(command_prompt=command_prompt, session_id=session_id):
             
             # HITL (Pause) 상태 감지
@@ -119,12 +123,13 @@ async def _run_pipeline(workspace: str):
         console.print(f"\n[bold red]❌ 파이프라인 실행 중 오류가 발생했습니다: {e}[/bold red]")
 
 @app.command
-def sync(workspace: str = None):
+def sync(workspace: str = None, agent: str = "antigravity"):
     """
     사내 BookStack에 정의된 L1/L2 정책을 로컬 환경에 병합하고 배포합니다.
     
     Args:
         workspace: 동기화할 타겟 프로젝트 ID. 누락 시 대화형 자동완성 프롬프트가 실행됩니다.
+        agent: 대상 AI 에이전트 (기본값: antigravity)
     """
     # 워크스페이스 미입력 시 prompt_toolkit 자동완성 프롬프트 실행 (동기 컨텍스트)
     if not workspace:
@@ -142,8 +147,8 @@ def sync(workspace: str = None):
             console.print("[bold red]❌ 워크스페이스 입력이 취소되었습니다.[/bold red]")
             return
 
-    # 비동기 이벤트 루프 실행
-    asyncio.run(_run_pipeline(workspace))
+    # 비동기 이벤트 루프 실행 시 agent 인자 전달
+    asyncio.run(_run_pipeline(workspace, agent))
 
 def main():
     load_dotenv()

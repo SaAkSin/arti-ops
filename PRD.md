@@ -1,13 +1,13 @@
-# 📄 [PRD] arti-ops v0.1.0 제품 요구사항 명세서
+# 📄 [PRD] arti-ops v0.2.0 제품 요구사항 명세서
 
 ## 1. 제품 개요 (Product Overview)
 
 * **제품명:** arti-ops (ADK 기반 Antigravity 통합 AgentOps 플랫폼)
-* **목적:** 20개 이상의 다중 프로젝트에서 활동하는 AI 에이전트(Antigravity)의 Rule, Skill, Workflow를 **BookStack(사내 위키)에서 중앙 통제**하고, 전역(Global) 정책과 개별 프로젝트(Workspace) 정책을 충돌 없이 안전하게 **자동 병합(Soft-Merge) 및 배포**하는 지능형 CLI/TUI 환경 구축.
+* **목적:** 20개 이상의 다중 프로젝트에서 활동하는 AI 에이전트(Antigravity)의 Rule, Skill, Workflow를 **BookStack(사내 위키)에서 중앙 통제**하고, 전역(Global) 정책과 개별 프로젝트(Workspace) 정책을 충돌 없이 안전하게 **자동 병합(Soft-Merge) 및 배포**하는 지능형 대화형 CLI 환경 구축.
 * **핵심 가치:**
 1. **Docs-as-Agent:** 코드를 몰라도 BookStack에 자연어로 정책을 쓰면 에이전트가 이를 코드로 변환하여 배포합니다.
 2. **계층형 거버넌스:** 전사 공통 보안 규칙(Global)은 강제하되, 프로젝트 팀의 자율적인 환경(Workspace) 구축을 지원합니다.
-3. **Zero-Friction:** `uv` 패키지 매니저 기반 1분 자동 설치 및 무중단 업데이트를 제공하며, Claude CLI 스타일의 TUI로 직관적인 모니터링이 가능합니다.
+3. **Zero-Friction:** `uv` 패키지 매니저 기반 1분 자동 설치 및 무중단 업데이트를 제공하며, Cyclopts + Rich + prompt_toolkit 기반의 쾌적한 대화형 CLI로 직관적인 모니터링과 피드백 입력이 가능합니다.
 
 
 
@@ -22,7 +22,7 @@
 
 
 * **일반 개발자 (User):**
-> "복잡한 세팅 없이 터미널에서 `arti-ops sync` 명령어 한 줄로 최신 전역/로컬 룰을 내 PC에 안전하게 병합하고, 실시간 마크다운 채팅 뷰(TUI)로 그 과정을 지켜보고 싶다."
+> "복잡한 세팅 없이 터미널에서 `arti-ops sync` 명령어 한 줄로 최신 전역/로컬 룰을 내 PC에 안전하게 병합하고, 깔끔한 대화형 인터페이스(CLI)로 그 과정을 지켜보며 필요시 즉시 피드백을 전달하고 싶다."
 
 
 
