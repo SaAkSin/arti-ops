@@ -61,6 +61,11 @@ class Configurator:
         if str(self.get("USE_GWS_CLI", "false")).lower() == "true":
             self._validate_gws()
             
+        # 6. Inject SDK required env variables
+        api_key = self.get("GEMINI_API_KEY")
+        if api_key:
+            os.environ["GEMINI_API_KEY"] = api_key
+            
     def _validate_gws(self):
         if not shutil.which("gws"):
             logger.warning("[WARNING] USE_GWS_CLI is enabled, but 'gws' binary is not found in PATH.")
