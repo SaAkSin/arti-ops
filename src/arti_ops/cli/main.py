@@ -237,9 +237,8 @@ async def run_interactive_loop(workspace: str, target_agent: str):
             if user_input.lower() in ["s", "start"]:
                 console.print(
                     "\n[dim]★ 작성 예시:[/dim]\n"
-                    "[dim]  1) s 현재 프로젝트의 코딩 스타일 규칙(rule) 마크다운 파일을 하나 생성해줘.[/dim]\n"
-                    "[dim]  2) s pytest를 구동해 테스트 커버리지를 검사하고 보고서를 만드는 스킬(skill) 스크립트를 작성해줘.[/dim]\n"
-                    "[dim]  3) s 데이터베이스 마이그레이션을 돕는 python 스크립트를 포함한 범용 스킬 패키지를 작성해줘.[/dim]"
+                    "[dim]  1) 시작[/dim]\n"
+                    "[dim]  2) 에이전트가 PR 리뷰를 수행할 수 있도록 돕는 코드 분석 스킬(skill) 스크립트를 만들어줘.[/dim]"
                 )
                 with patch_stdout():
                     user_prompt = await session.prompt_async("■ 수행할 AI 파이프라인 작업을 구체적으로 입력하세요 ❯ ")
