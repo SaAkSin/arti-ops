@@ -125,7 +125,10 @@ async def run_list_viewer(plan_lookup, base_dir):
     @kb.add("escape")
     @kb.add("enter")
     def _(event):
-        event.app.exit()
+        try:
+            event.app.exit()
+        except Exception:
+            pass
 
     @kb.add("tab")
     def _(event):
