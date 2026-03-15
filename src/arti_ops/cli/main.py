@@ -264,6 +264,9 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     console.print(f"\n[yellow]⚠ '{user_prompt}' 커맨드는 메인 프롬프트에서 단독으로 입력해주세요. 파이프라인 지시사항으로는 부적절합니다.[/yellow]")
                     continue
 
+            if user_prompt in ['1', '시작']:
+                user_prompt = "현재 로컬 프로젝트의 구조와 이미 정의된 위키 정책들을 전반적으로 분석하십시오. 만약 위키에 존재하는 핵심/범용 규정이 있지만 이 워크스페이스 로컬(`.agents`)에 아직 반영되지 않았다면, 현재 프로젝트의 성격과 환경에 맞게 내용을 변형·병합하여 최적화된 로컬 룰(Rule)이나 범용 스킬(Skill)로 작성해줘."
+
             console.print(f"\n[cyan]▶ 파이프라인 수행 지시:[/cyan] {user_prompt}\n")
             
             command_prompt = (
