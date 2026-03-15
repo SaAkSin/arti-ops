@@ -125,10 +125,14 @@ async def run_interactive_loop(workspace: str, target_agent: str):
             if user_input.lower() in ['u', 'upsert']:
                 bookstack = BookStackToolset()
                 with console.status("[cyan]BookStack 위키와 로컬 현황을 비교 분석 중입니다...[/cyan]", spinner="dots"):
-                    plan = await bookstack.get_upsert_plan(workspace)
-                
+                    try:
+                        plan = await bookstack.get_upsert_plan(workspace)
+                    except ValueError as e:
+                        console.print(f"\n[bold yellow]⚠ {e}[/bold yellow]")
+                        continue
+                        
                 if not plan:
-                    console.print("[yellow]▼ 동기화할 수 있는 로컬(L3) 에셋(규칙, 스킬)을 찾을 수 없거나 BookStack 챕터 오류입니다.[/yellow]")
+                    console.print("[yellow]▼ 동기화할 수 있는 로컬(L3) 에셋(규칙, 스킬)을 찾을 수 없거나 BookStack 챕터 구조에 문제가 있습니다.[/yellow]")
                     continue
                 
                 # 액션에 따른 심볼 매핑
@@ -183,7 +187,11 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                 
                 bookstack = BookStackToolset()
                 with console.status("[cyan]BookStack 위키와 로컬 현황을 비교 분석 중입니다...[/cyan]", spinner="dots"):
-                    plan = await bookstack.get_upsert_plan(workspace)
+                    try:
+                        plan = await bookstack.get_upsert_plan(workspace)
+                    except ValueError as e:
+                        console.print(f"\n[bold yellow]⚠ {e}[/bold yellow]")
+                        continue
                 
                 # 룩업 딕셔너리 생성 (rel_path: action)
                 plan_lookup = {item["rel_path"]: item["action"] for item in plan}

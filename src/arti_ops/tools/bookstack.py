@@ -229,8 +229,9 @@ class BookStackToolset(BaseToolset):
                 books_data = books_res.json().get("data", [])
                 
                 if not books_data:
-                    logger.error(f"Book not found for slug '{book_slug}'")
-                    return plan
+                    error_msg = f"BookStack에서 '{book_slug}' 이름의 책(Book)을 찾을 수 없습니다. 위키에 접속하여 해당 프로젝트명으로 책을 먼저 생성해주세요."
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
                 book_id = books_data[0]["id"]
                 
                 # 2. 책 상세 정보 조회 (하위 챕터 획득)
