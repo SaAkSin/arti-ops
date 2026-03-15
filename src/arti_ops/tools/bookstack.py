@@ -216,7 +216,7 @@ class BookStackToolset(BaseToolset):
 
     async def create_workspace_book(self, project_id: str) -> bool:
         """새로운 워크스페이스용 책(Book)과 필수 챕터(rules, skills)를 생성합니다."""
-        book_name = f"Workspace: {project_id}"
+        book_name = f"[Workspace] {project_id}"
         
         async with httpx.AsyncClient() as client:
             headers = self.get_headers()
