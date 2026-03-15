@@ -483,9 +483,12 @@ def main_cli(workspace: Optional[str] = None, agent: str = "antigravity"):
     asyncio.run(run_interactive_loop(workspace, agent))
 
 def main():
-    os.makedirs("logs", exist_ok=True)
+    log_dir = os.path.expanduser("~/.arti-ops/logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, "arti-ops-cli.log")
+    
     logging.basicConfig(
-        filename="logs/arti-ops-cli.log",
+        filename=log_file,
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
