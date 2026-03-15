@@ -19,6 +19,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.shortcuts import clear, checkboxlist_dialog, yes_no_dialog
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.styles import Style
+from prompt_toolkit.formatted_text import HTML
 
 from ..core.pipeline import ArtiOpsPipeline
 from ..tools.bookstack import BookStackToolset
@@ -84,10 +85,16 @@ async def run_interactive_loop(workspace: str, target_agent: str):
         title="arti-ops v0.5.0", border_style="blue"
     ))
 
+    def get_bottom_toolbar():
+        if getattr(session, 'is_hitl', False):
+            return HTML(' [<style fg="#888888"><i>s &lt;내용&gt;: 파이프라인 시작</i></style> | q: 종료 | <style fg="#888888"><i>r: 재시작</i></style> | <style fg="#888888"><i>u: 배포</i></style> | <style fg="#888888"><i>l: 파일 현황</i></style> | <style fg="#888888"><i>기타: 일반 AI 질의응답</i></style>]')
+        return " [s <내용>: 파이프라인 시작 | q: 종료 | r: 재시작 | u: 배포 | l: 파일 현황 | 기타: 일반 AI 질의응답]"
+
     session = PromptSession(
-        bottom_toolbar=lambda: " [s <내용>: 파이프라인 시작 | q: 종료 | r: 재시작 | u: 배포 | l: 파일 현황 | 기타: 일반 AI 질의응답]",
+        bottom_toolbar=get_bottom_toolbar,
         style=pt_style
     )
+    session.is_hitl = False
 
     while True:
         try:
@@ -109,6 +116,8 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     try:
                         conn = sqlite3.connect(db_path)
                         cursor = conn.cursor()
+                        # cascade가 동작하지 않을 수 있으므로 events 테이블에서 먼저 삭제
+                        cursor.execute("DELETE FROM events WHERE session_id LIKE ?", (f"%{workspace}%",))
                         # id 컬럼에 workspace(session_id 생성 규칙 참고)가 포함된 모든 세션 삭제
                         cursor.execute("DELETE FROM sessions WHERE id LIKE ?", (f"%{workspace}%",))
                         conn.commit()
@@ -373,9 +382,12 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                                 console.print(Panel(Markdown(event.get("report", "내용 없음")), title="≡ [최종 반영 검토 보고서]", border_style="yellow"))
                                 console.print("[bold yellow]❖ 위 산출물을 확인하고 승인(Y) 하거나 수정 지시를 입력하세요.[/bold yellow]")
                                 
+                                cancel_pipeline = False
                                 while True:
+                                    session.is_hitl = True
                                     with patch_stdout():
-                                        sub_input = await session.prompt_async("■ 승인(Y) / 반려(N) / 수정 요청 ❯ ")
+                                        sub_input = await session.prompt_async("■ 승인(Y) / 반려(N) / 취소(C) / 수정 요청 ❯ ")
+                                    session.is_hitl = False
                                     sub_input = sub_input.strip()
                                     
                                     if sub_input.lower() in ['q', 'quit']:
@@ -386,9 +398,14 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                                         console.print("\n[bold green]✔ 승인 완료. 로컬 배포 및 GWS 요약 전송을 시작합니다.[/bold green]")
                                         await pipeline.resume(session_id, {"approved": True})
                                         break
-                                    elif sub_input.lower() in ['n', 'no', '반려', '거절', '취소']:
-                                        console.print("\n[bold red]X 승인 거절. 초기 프롬프트로 돌아갑니다.[/bold red]")
+                                    elif sub_input.lower() in ['n', 'no', '반려', '거절']:
+                                        console.print("\n[bold red]X 승인 거절. 요구사항을 반영하여 재기획합니다.[/bold red]")
                                         await pipeline.resume(session_id, {"approved": False, "feedback": "사용자가 반려했습니다."})
+                                        break
+                                    elif sub_input.lower() in ['c', '취소', 'cancel']:
+                                        console.print("\n[bold yellow]■ 파이프라인 수행을 취소하고 초기 프롬프트로 돌아갑니다.[/bold yellow]")
+                                        cancel_pipeline = True
+                                        # pipeline generator cleanup will be triggered when breaking out of async for
                                         break
                                     else:
                                         console.print(f"\n[bold magenta]▶ 피드백 전달 완료. 요구사항을 반영하여 재기획합니다...[/bold magenta]")
@@ -402,6 +419,8 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                                         break
                                 
                                 live.start() # 트리 렌더링 재개
+                                if cancel_pipeline:
+                                    break
                 finally:
                     animator_task.cancel()
 
