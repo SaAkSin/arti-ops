@@ -109,8 +109,8 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     try:
                         conn = sqlite3.connect(db_path)
                         cursor = conn.cursor()
-                        # session_id 에 workspace가 포함된 모든 세션 삭제
-                        cursor.execute("DELETE FROM sessions WHERE session_id LIKE ?", (f"%{workspace}%",))
+                        # id 컬럼에 workspace(session_id 생성 규칙 참고)가 포함된 모든 세션 삭제
+                        cursor.execute("DELETE FROM sessions WHERE id LIKE ?", (f"%{workspace}%",))
                         conn.commit()
                         conn.close()
                     except Exception as e:
