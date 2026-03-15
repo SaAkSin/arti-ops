@@ -15,8 +15,8 @@ if ! command -v uv &> /dev/null; then
     echo "➜ 파이썬 패키지 매니저 'uv'가 설치되어 있지 않습니다. 설치를 진행합니다..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
     
-    # 임시로 현재 쉘 세션에 uv 경로 추가
-    export PATH="$HOME/.cargo/bin:$PATH"
+    # 임시로 현재 쉘 세션에 uv 및 로컬 패키지 경로 추가
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
     
     if ! command -v uv &> /dev/null; then
         echo "✖ 'uv' 설치에 실패했거나 환경 변수(PATH)에 추가되지 않았습니다."
@@ -30,8 +30,12 @@ else
 fi
 
 # 2. arti-ops 전역 설치 (최신 main 브랜치 기준으로 설치 및 업데이트)
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 echo "➜ 'arti-ops' CLI 도구를 시스템 전역에 설치(또는 업데이트)합니다..."
 uv tool install --force "git+https://github.com/SaAkSin/arti-ops.git@main"
+
+# PATH 환경 변수 영구 등록 (uv 내부 기능 호출)
+uv tool update-shell > /dev/null 2>&1 || true
 
 # 3. 설치 가이드 및 다음 단계 안내
 echo ""
