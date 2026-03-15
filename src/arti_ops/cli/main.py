@@ -170,7 +170,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     
                 with console.status(f"[bold green]▶ {len(selected_plan)}개의 항목을 대상 BookStack 워크스페이스에 배포합니다...[/bold green]", spinner="dots"):
                     await bookstack.execute_upsert(selected_plan)
-                console.print("[bold cyan]√ 로컬-위키 연동이 성공적으로 완료되었습니다![/bold cyan]")
+                console.print("[bold cyan]✔ 로컬-위키 연동이 성공적으로 완료되었습니다![/bold cyan]")
                 continue
                 
             # Local Asset List 조회
@@ -190,7 +190,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                 # 대화형 List Viewer 실행
                 await run_list_viewer(plan_lookup, base_dir)
                 
-                console.print("\n[bold cyan]√ 로컬 현황 조회를 완료했습니다.[/bold cyan]")
+                console.print("\n[bold cyan]✔ 로컬 현황 조회를 완료했습니다.[/bold cyan]")
                 continue
                 
             if not user_input:
@@ -204,7 +204,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
             user_prompt = user_input[2:].strip() if user_input.lower().startswith("s ") else user_input[6:].strip()
             if user_input.lower() in ["s", "start"]:
                 console.print(
-                    "\n[dim]💡 작성 예시:[/dim]\n"
+                    "\n[dim]★ 작성 예시:[/dim]\n"
                     "[dim]  1) s 현재 프로젝트의 코딩 스타일 규칙(rule) 마크다운 파일을 하나 생성해줘.[/dim]\n"
                     "[dim]  2) s pytest를 구동해 테스트 커버리지를 검사하고 보고서를 만드는 스킬(skill) 스크립트를 작성해줘.[/dim]\n"
                     "[dim]  3) s 데이터베이스 마이그레이션을 돕는 python 스크립트를 포함한 범용 스킬 패키지를 작성해줘.[/dim]"
@@ -221,7 +221,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     continue
                     
                 if user_prompt.lower() in ['l', 'list', 'u', 'upsert', 'r', 'reset']:
-                    console.print(f"\n[yellow]⚠️ '{user_prompt}' 커맨드는 메인 프롬프트에서 단독으로 입력해주세요. 파이프라인 지시사항으로는 부적절합니다.[/yellow]")
+                    console.print(f"\n[yellow]⚠ '{user_prompt}' 커맨드는 메인 프롬프트에서 단독으로 입력해주세요. 파이프라인 지시사항으로는 부적절합니다.[/yellow]")
                     continue
 
             console.print(f"\n[cyan]▶ 파이프라인 수행 지시:[/cyan] {user_prompt}\n")
@@ -352,7 +352,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                                         console.print("\n[bold red]■ 프로그램을 즉시 종료합니다.[/bold red]")
                                         sys.exit(0)
                                     elif sub_input.lower() in ['y', 'yes', '승인', 'ㅇㅇ', '']:
-                                        console.print("\n[bold green]√ 승인 완료. 로컬 배포 및 GWS 요약 전송을 시작합니다.[/bold green]")
+                                        console.print("\n[bold green]✔ 승인 완료. 로컬 배포 및 GWS 요약 전송을 시작합니다.[/bold green]")
                                         await pipeline.resume(session_id, {"approved": True})
                                         break
                                     elif sub_input.lower() in ['n', 'no', '반려', '거절', '취소']:
@@ -374,7 +374,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                 finally:
                     animator_task.cancel()
 
-            console.print("\n[bold green]🎉 요청하신 파이프라인 작업이 완료되었습니다. 추가 지시를 입력하세요.[/bold green]")
+            console.print("\n[bold green]★ 요청하신 파이프라인 작업이 완료되었습니다. 추가 지시를 입력하세요.[/bold green]")
 
         except KeyboardInterrupt:
             console.print("\n[bold red]👋 사용자에 의해 강제 종료되었습니다 (Ctrl+C).[/bold red]")
@@ -383,7 +383,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
             sys.exit(0)
         except Exception as e:
             console.print_exception(show_locals=False)
-            console.print(f"\n[bold red]❌ 에러 발생: {e}[/bold red]")
+            console.print(f"\n[bold red]✖ 에러 발생: {e}[/bold red]")
 
 
 @app.command

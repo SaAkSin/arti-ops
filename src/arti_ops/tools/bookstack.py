@@ -162,6 +162,7 @@ class BookStackToolset(BaseToolset):
                 
             except Exception as e:
                 logger.error(f"====== [BookStack API] Error connecting for '{book_slug}': {str(e)} ======")
+                console.print(f"[red]✖ .artiops.toml 및 글로벌 인증 파일에서 BookStack 인증 정보를 찾을 수 없습니다.[/red]")
                 return f"Error connecting to BookStack API: {str(e)}"
 
     async def publish_sync_report(self, project_id: str, diff_md: str) -> str:
@@ -352,6 +353,7 @@ class BookStackToolset(BaseToolset):
                             item["action"] = "Match"
                     except Exception as e:
                         logger.warning(f"Failed to fetch content for comparison: {e}")
+                        console.print(f"[red]✖ .artiops.toml 및 글로벌 인증 파일에서 'gemini.api_key'를 찾을 수 없습니다.[/red]")
 
                 if update_items:
                     await asyncio.gather(*(fetch_and_compare(item) for item in update_items))
@@ -383,6 +385,8 @@ class BookStackToolset(BaseToolset):
                         res = await client.put(url, headers=headers, json=payload)
                         res.raise_for_status()
                         logger.info(f"Updated page: {item['name']}")
+                        console.print(f"[blue]▶ BookStack 페이지 업데이트 완료:[/blue] {item['name']} (ID: {item['page_id']})")
                 except Exception as e:
                     logger.error(f"Failed to {item['action']} page {item['name']}: {e}")
+                    console.print(f"[bold red]✖ Upsert 실패: {item['name']} (BookStack API 에러)[/bold red]")
 
