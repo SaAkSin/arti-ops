@@ -182,7 +182,7 @@ class ArtiOpsPipeline:
                     continue
                 else:
                     verifier_passed = True
-                    current_input = f"[최종 승인된 기획안]\n{ver_text}\n\n승인된 내용대로 로컬 파일 쓰기 및 GWS 알림 전송을 수행하세요."
+                    current_input = f"[최종 승인된 기획안 (원본 코드)]\n{arch_text}\n\n[검증 결과 요약]\n{ver_text}\n\n위 승인된 기획안(원본 코드)의 내용을 바탕으로 로컬 파일 쓰기(`write_file` 도구 사용)를 수행하세요. 파일 생성 시 내용(content) 인자에는 요약문이 아닌 원본 마크다운/코드 전체가 반드시 포함되어야 합니다."
                 
         if not verifier_passed:
             return
