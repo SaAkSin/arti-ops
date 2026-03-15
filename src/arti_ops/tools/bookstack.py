@@ -214,6 +214,51 @@ class BookStackToolset(BaseToolset):
             except Exception as e:
                 return f"Error publishing sync report: {str(e)}"
 
+    async def create_workspace_book(self, project_id: str) -> bool:
+        """새로운 워크스페이스용 책(Book)과 필수 챕터(rules, skills)를 생성합니다."""
+        book_name = f"Workspace: {project_id}"
+        
+        async with httpx.AsyncClient() as client:
+            headers = self.get_headers()
+            try:
+                # 1. 책 생성
+                url = f"{self.api_url}/books"
+                payload = {
+                    "name": book_name,
+                    "description": f"Auto-generated workspace book for {project_id}"
+                }
+                res = await client.post(url, headers=headers, json=payload)
+                res.raise_for_status()
+                book_id = res.json()["id"]
+                
+                # 2. 필수 챕터 생성
+                chapters_url = f"{self.api_url}/chapters"
+                for target in ["rules", "skills"]:
+                    chap_payload = {
+                        "book_id": book_id,
+                        "name": target,
+                        "description": f"Agent {target} storage"
+                    }
+                    c_res = await client.post(chapters_url, headers=headers, json=chap_payload)
+                    c_res.raise_for_status()
+                    
+                # 3. 릴리즈 노트 페이지 스캐폴딩 (루트에 생성)
+                page_url = f"{self.api_url}/pages"
+                page_payload = {
+                    "book_id": book_id,
+                    "name": f"[Workspace] {project_id} Release Notes",
+                    "markdown": f"# Release Notes\n\nAutomated deployments for {project_id} will be recorded here."
+                }
+                p_res = await client.post(page_url, headers=headers, json=page_payload)
+                p_res.raise_for_status()
+                
+                logger.info(f"Successfully created workspace book and structure for {project_id}")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Failed to create workspace book: {e}")
+                raise ValueError(f"워크스페이스 생성 실패: {e}")
+
     async def get_upsert_plan(self, project_id: str) -> list[dict]:
         """로컬 .agents 데이터를 스캔하고 BookStack과 비교하여 배포 계획을 생성합니다."""
         plan = []

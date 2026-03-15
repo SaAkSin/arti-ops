@@ -15,8 +15,7 @@ from rich.markdown import Markdown
 from rich.tree import Tree
 from rich.live import Live
 
-from prompt_toolkit import PromptSession
-from prompt_toolkit.shortcuts import clear, checkboxlist_dialog
+from prompt_toolkit.shortcuts import clear, checkboxlist_dialog, yes_no_dialog
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.styles import Style
 
@@ -128,7 +127,30 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     try:
                         plan = await bookstack.get_upsert_plan(workspace)
                     except ValueError as e:
-                        console.print(f"\n[bold yellow]⚠ {e}[/bold yellow]")
+                        plan = None
+                        error_msg = str(e)
+                
+                # 책이 없어서 예외가 발생한 경우 자동 생성 제안 (u 커맨드 전용)
+                if plan is None:
+                    do_create = await asyncio.to_thread(
+                        yes_no_dialog(
+                            title="위키 책(Book) 자동 생성",
+                            text=f"{error_msg}\n\n지금 자동으로 '{workspace}' 프로젝트를 위한 새 책과 구조(rules, skills)를 위키에 생성하시겠습니까?",
+                            style=pt_style
+                        ).run
+                    )
+                    
+                    if do_create:
+                        with console.status("[cyan]▶ 새 워크스페이스 구조를 BookStack에 생성하고 있습니다...[/cyan]", spinner="dots"):
+                            try:
+                                await bookstack.create_workspace_book(workspace)
+                                console.print("\n[bold green]✔ 새 위키 구조가 생성되었습니다! 로컬 배포 플랜을 다시 계산합니다.[/bold green]")
+                                plan = await bookstack.get_upsert_plan(workspace)
+                            except Exception as ex:
+                                console.print(f"\n[bold red]✖ 위키 자동 생성 실패: {ex}[/bold red]")
+                                continue
+                    else:
+                        console.print("\n[dim]작업이 취소되었습니다.[/dim]")
                         continue
                         
                 if not plan:
