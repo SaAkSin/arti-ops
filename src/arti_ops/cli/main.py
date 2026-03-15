@@ -4,6 +4,7 @@ import asyncio
 import logging
 import sqlite3
 import shutil
+import httpx
 from pathlib import Path
 
 from cyclopts import App as CycloptsApp
@@ -41,6 +42,34 @@ pt_style = Style.from_dict({
     'button.focused': 'bg:#00aa00 #ffffff bold',
 })
 
+async def handle_chat_query(user_input: str, workspace: str, console):
+    api_key = Configurator.get_instance().get("GEMINI_API_KEY")
+    model_name = Configurator.get_instance().get("GEMINI_MODEL_FLASH", "gemini-2.5-flash")
+    if not api_key:
+        console.print("[red]GEMINI_API_KEY가 설정되어 있지 않습니다.[/red]")
+        return
+        
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+    system_instruction = f"당신은 arti-ops CLI의 친절한 보조 AI 어시스턴트입니다.\n현재 사용자의 워크스페이스는 '{workspace}' 이며, 시스템이나 요구사항에 대한 질문에 간결하고 도움되는 답변을 한국어로 제공하세요."
+    payload = {
+        "system_instruction": {
+            "parts": [{"text": system_instruction}]
+        },
+        "contents": [{"parts": [{"text": user_input}]}]
+    }
+    
+    try:
+        with console.status("[cyan]AI 응답 생성 중...[/cyan]", spinner="dots"):
+            async with httpx.AsyncClient() as client:
+                res = await client.post(url, json=payload, timeout=30.0)
+                res.raise_for_status()
+                data = res.json()
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+        
+        console.print(Panel(Markdown(text), title="💬 [bold cyan]Agent Assistant[/bold cyan]", border_style="cyan"))
+    except Exception as e:
+        console.print(f"[red]답변 생성 중 오류가 발생했습니다: {e}[/red]")
+
 async def run_interactive_loop(workspace: str, target_agent: str):
     pipeline = ArtiOpsPipeline(target_project_id=workspace)
     session_id = f"sess_{workspace}_{target_agent}"
@@ -55,7 +84,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
     ))
 
     session = PromptSession(
-        bottom_toolbar=lambda: " [q: 즉시 종료 / r: 세션 초기화 / u: 위키 수동 배포 / l: 로컬 상태 조회 / Ctrl+C: 취소] 지시사항을 자연어로 입력하세요.",
+        bottom_toolbar=lambda: " [s <내용>: 파이프라인 시작 | q: 종료 | r: 재시작 | u: 배포 | l: 파일 현황 | 기타: 일반 AI 질의응답]",
         style=pt_style
     )
 
@@ -167,10 +196,38 @@ async def run_interactive_loop(workspace: str, target_agent: str):
             if not user_input:
                 continue
 
-            console.print(f"\n[cyan]▶ 사용자 지시:[/cyan] {user_input}\n")
+            # 일반 챗 쿼리인지 파이프라인 시작(s)인지 분기
+            if not (user_input.lower().startswith("s ") or user_input.lower() == "s" or user_input.lower().startswith("start ") or user_input.lower() == "start"):
+                await handle_chat_query(user_input, workspace, console)
+                continue
+                
+            user_prompt = user_input[2:].strip() if user_input.lower().startswith("s ") else user_input[6:].strip()
+            if user_input.lower() in ["s", "start"]:
+                console.print(
+                    "\n[dim]💡 작성 예시:[/dim]\n"
+                    "[dim]  1) s 현재 프로젝트의 코딩 스타일 규칙(rule) 마크다운 파일을 하나 생성해줘.[/dim]\n"
+                    "[dim]  2) s pytest를 구동해 테스트 커버리지를 검사하고 보고서를 만드는 스킬(skill) 스크립트를 작성해줘.[/dim]\n"
+                    "[dim]  3) s 데이터베이스 마이그레이션을 돕는 python 스크립트를 포함한 범용 스킬 패키지를 작성해줘.[/dim]"
+                )
+                with patch_stdout():
+                    user_prompt = await session.prompt_async("■ 수행할 AI 파이프라인 작업을 구체적으로 입력하세요 ❯ ")
+                    user_prompt = user_prompt.strip()
+                    
+                if user_prompt.lower() in ['q', 'quit']:
+                    console.print("\n[bold red]■ 프로그램을 즉시 종료합니다.[/bold red]")
+                    sys.exit(0)
+                        
+                if not user_prompt:
+                    continue
+                    
+                if user_prompt.lower() in ['l', 'list', 'u', 'upsert', 'r', 'reset']:
+                    console.print(f"\n[yellow]⚠️ '{user_prompt}' 커맨드는 메인 프롬프트에서 단독으로 입력해주세요. 파이프라인 지시사항으로는 부적절합니다.[/yellow]")
+                    continue
+
+            console.print(f"\n[cyan]▶ 파이프라인 수행 지시:[/cyan] {user_prompt}\n")
             
             command_prompt = (
-                f"사용자 지시: \"{user_input}\"\n\n"
+                f"사용자 지시: \"{user_prompt}\"\n\n"
                 f"Target Workspace: `{workspace}`\n"
                 f"타겟 에이전트: `{target_agent}`\n"
                 f"위 지시를 바탕으로 로컬 현황과 BookStack 정책을 융합하여 새로운 룰/스킬을 생성하세요."
