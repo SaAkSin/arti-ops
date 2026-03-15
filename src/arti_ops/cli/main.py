@@ -15,6 +15,7 @@ from rich.markdown import Markdown
 from rich.tree import Tree
 from rich.live import Live
 
+from prompt_toolkit import PromptSession
 from prompt_toolkit.shortcuts import clear, checkboxlist_dialog, yes_no_dialog
 from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.styles import Style
