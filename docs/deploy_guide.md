@@ -25,7 +25,7 @@
 사용 중인 PC에 파이썬 관리 도구인 `uv` 가 깔려있는지 여부를 확인하고, 없으면 자동으로 다운로드 한 뒤 `arti-ops` 까지 한 번에 전역(Global) 설치를 진행해 주는 원격 스크립트입니다.
 터미널에서 아래 명령어 한 줄만 실행하세요. (이 명령어는 항상 최신 `main` 릴리즈를 추적하여 동기화합니다.)
 ```bash
-curl -fsSL https://arti-ops.artgrammer.co.kr | bash
+curl -fsSL http://arti-ops.artgrammer.co.kr | bash
 ```
 
 ### 옵션 2: 수동 설치 (`uv`가 이미 있는 경우)
@@ -80,7 +80,7 @@ uv tool upgrade arti-ops
 
 ## 5. 고급 설정: 커스텀 도메인 설치 주소 생성
 
-가장 짧고 깔끔한 명령어(`curl -sL https://arti-ops.my-domain.com | bash`) 형태의 사내 배포 포인트를 만들고 싶다면, AWS Route 53과 Github Pages를 조합하여 운영 비용 없이 구축할 수 있습니다.
+가장 짧고 깔끔한 명령어(`curl -sL http://arti-ops.artgrammer.co.kr | bash`) 형태의 사내 배포 포인트를 만들고 싶다면, AWS Route 53과 Github Pages를 조합하여 운영 비용 없이 구축할 수 있습니다.
 
 **요구 사항:**
 - 저장소가 Public (공개) 상태이거나 Github Enterprise를 사용 중일 것
@@ -105,4 +105,4 @@ uv tool upgrade arti-ops
 1. AWS DNS 전파가 끝날 때까지 1~5분 정도 대기합니다.
 2. 다시 Github Settings > Pages 로 돌아와서, 입력했던 Custom domain 상태 창이 `DNS check successful` (초록색 체크)로 변했는지 확인합니다.
 3. 하단의 **Enforce HTTPS** 옵션을 반드시 **체크**합니다.
-4. 이제 브라우저에서 `https://arti-ops.artgrammer.co.kr/install.sh` 에 접속하면 Github의 Raw 스크립트 소스코드 텍스트가 정상적으로 노출되는 것을 볼 수 있습니다.
+4. 이제 브라우저에서 `http://arti-ops.artgrammer.co.kr/install.sh` 에 접속하면 Github의 Raw 스크립트 소스코드 텍스트가 정상적으로 노출되는 것을 볼 수 있습니다.

@@ -29,7 +29,7 @@
 `arti-ops`는 파이썬 환경이나 패키지 매니저(`uv`)의 존재 유무와 관계없이, 터미널에서 다음 명령어 한 줄이면 모든 종속성 설치 및 시스템 전역(Global) 셋업이 완료됩니다.
 
 ```bash
-curl -fsSL https://arti-ops.artgrammer.co.kr | bash
+curl -fsSL http://arti-ops.artgrammer.co.kr | bash
 ```
 > 설치가 끝나면 터미널에서 `arti-ops init`을 실행하여 워크스페이스를 초기화하세요. 상세한 커스텀 배포 및 수동 설치 방법은 [배포 가이드(docs/deploy_guide.md)](docs/deploy_guide.md)를 참조하세요.
 
