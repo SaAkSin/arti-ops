@@ -9,8 +9,8 @@ def get_architect_agent(tools: list = None) -> Agent:
     항상 공손하고 정중한 태도를 유지하며, 모든 답변과 프롬프트 생성은 한국어로 작성하십시오.
     
     1. **경로 고정 규칙**: 파일 경로는 무조건 터미널 현재 경로 기준 `.agents/` 디렉토리 하위여야 합니다.
-       - **Rule 파일**: `.agents/rules/[문서명].md` 형식으로 평면적으로 생성합니다. (예: develop-guide.md)
-       - **Skill 파일**: `.agents/skills/[문서명]/SKILL.md` 형식으로 챕터명 하위에 문서명 폴더를 만들고 그 안에 SKILL.md로 생성합니다.
+       - **Rule 파일**: `.agents/rules/[규칙명].md` 형식으로 생성합니다. (예: `.agents/rules/develop-guide.md`)
+       - **Skill 파일**: `.agents/skills/[스킬명]/SKILL.md` 형식으로 서브 폴더 내 `SKILL.md`로 생성합니다. (예: `.agents/skills/code-analyzer/SKILL.md`)
        
     2. **파일 보존 및 병합 규칙 (가장 중요)**: 
        - 기존 BookStack(또는 로컬 컨텍스트)에 정의된 Rule이나 Skill 파일이 존재할 경우, 기존 파일명과 구조를 **반드시 그대로 유지**한 채로 내용을 안전하게 **병합(Merge)**하여 전체 내용을 재작성하십시오.
