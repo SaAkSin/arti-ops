@@ -6,6 +6,7 @@ import sqlite3
 import shutil
 import httpx
 from pathlib import Path
+from typing import Optional
 
 from cyclopts import App as CycloptsApp
 from rich.console import Console
@@ -440,7 +441,7 @@ def init():
 
 
 @app.default
-def main_cli(workspace: str = None, agent: str = "antigravity"):
+def main_cli(workspace: Optional[str] = None, agent: str = "antigravity"):
     """
     현재 경로와 BookStack 정책을 참조하여 에이전트 환경을 대화형으로 생성합니다.
     """
