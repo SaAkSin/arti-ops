@@ -59,7 +59,19 @@ class FileIOToolset(BaseToolset):
 
     async def write_file(self, relative_path: str, content: str) -> str:
         try:
+            # os.getcwd() gives the directory where the 'arti-ops' command was run
             base_dir = os.path.abspath(os.getcwd())
+            
+            # Remove any leading absolute slash or current-dir dot to ensure it joins correctly
+            if relative_path.startswith('/'):
+                relative_path = relative_path.lstrip('/')
+            elif relative_path.startswith('./'):
+                relative_path = relative_path[2:]
+            
+            # Force the relative path to start with .agents if it doesn't already
+            if not relative_path.startswith('.agents/'):
+                relative_path = f".agents/{relative_path}"
+                
             target_path = os.path.abspath(os.path.join(base_dir, relative_path))
             
             if not target_path.startswith(os.path.join(base_dir, ".agents")):
