@@ -3,11 +3,12 @@ import difflib
 import asyncio
 import subprocess
 from prompt_toolkit.application import Application, get_app
-from prompt_toolkit.layout.containers import HSplit, VSplit, Window
+from prompt_toolkit.layout.containers import HSplit, VSplit, Window, DynamicContainer
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import Condition, to_filter
+from prompt_toolkit.lexers import PygmentsLexer
 from prompt_toolkit.shortcuts import checkboxlist_dialog
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
@@ -15,6 +16,11 @@ from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 from arti_ops.agents.globalizer import get_globalizer_agent
+try:
+    from pygments.lexers.diff import DiffLexer as _DiffLexer
+    _DIFF_LEXER = PygmentsLexer(_DiffLexer)
+except Exception:
+    _DIFF_LEXER = None  # pygments 없으면 DiffLexer 없이 동작
 
 
 async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None, upsert_style=None, project_id=None):
@@ -114,6 +120,14 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         scrollbar=True,
         wrap_lines=True,
     )
+    # Diff 전용 TextArea: DiffLexer 로 +/- 색상 표시
+    diff_text_area = TextArea(
+        text="",
+        read_only=True,
+        scrollbar=True,
+        wrap_lines=False,
+        lexer=_DIFF_LEXER,
+    )
 
     def update_left_pane():
         """좌측 목록 배지를 plan_lookup 기준으로 다시 렌더링한다."""
@@ -192,12 +206,16 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             return "▶ 파일 미리보기 (포커스됨)"
         return "파일 미리보기"
 
+    def get_right_container():
+        """diff_view 여부에 따라 우측 패널 컴포넌트를 동적으로 전환한다."""
+        return diff_text_area if is_diff_view else right_text_area
+
     body = VSplit([
         Frame(
             Window(content=left_text_control, wrap_lines=False, width=40),
             title=lambda: "▶ 로컬 파일 목록 (포커스됨)" if current_focus == "left" else "로컬 파일 목록"
         ),
-        Frame(right_text_area, title=get_right_panel_title)
+        Frame(DynamicContainer(get_right_container), title=get_right_panel_title)
     ])
 
     toolbar = Window(
@@ -490,7 +508,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         original_content = right_text_area.text
         is_diff_view = True
         scope_label = "L1 Global" if scope == "global" else "L2 Workspace"
-        right_text_area.text = f"BookStack({scope_label}) 와 비교 중..."
+        diff_text_area.text = f"BookStack({scope_label}) 와 비교 중..."
         update_toolbar()
 
         try:
@@ -511,9 +529,9 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 lineterm=""
             ))
             result = "\n".join(diff_lines) if diff_lines else "차이 없음 — BookStack과 완전히 일치합니다."
-            right_text_area.text = result
+            diff_text_area.text = result
         except Exception as e:
-            right_text_area.text = f"[Diff 실패: {e}]\n\n{original_content}"
+            diff_text_area.text = f"[Diff 실패: {e}]"
             is_diff_view = False
         update_toolbar()
 
@@ -521,8 +539,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     @kb.add("c-c", filter=Condition(lambda: not is_edit_mode))
     @kb.add("c-@", filter=Condition(lambda: not is_edit_mode))  # macOS ⌘+C 바인딩
     def copy_to_clipboard(event):
-        """READ/L1 미리보기 모드에서 Ctrl+C / ⌘+C 로 우측 패널 내용을 클립보드에 복사한다."""
-        content = right_text_area.text
+        """READ/L1 미리보기/Diff 모드에서 Ctrl+C / ⌘+C 로 우측 패널 내용을 클립보드에 복사한다."""
+        content = diff_text_area.text if is_diff_view else right_text_area.text
         if content:
             subprocess.run(["pbcopy"], input=content, text=True, check=False)
 
