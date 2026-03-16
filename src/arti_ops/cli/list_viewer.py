@@ -496,8 +496,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         update_toolbar()
 
         try:
-            wiki_md = await asyncio.to_thread(
-                bookstack.fetch_policies,
+            wiki_md = await bookstack.fetch_policies(
                 scope_tag=scope,
                 project_id=getattr(bookstack, "workspace_id", "")
             )
