@@ -286,8 +286,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             current_focus = "left"
         update_toolbar()
 
-    # ─── 방향키: 좌측 탐색 또는 우측 스크롤 ───
-    @kb.add("up")
+    # ─── 방향키: 좌측 탐색 또는 우측 스크롤 (Diff 뷰 중에는 전얭 바인딩 실행 안 함) ───
+    @kb.add("up", filter=Condition(lambda: not is_diff_view))
     def _(event):
         nonlocal current_index
         if current_focus == "left":
@@ -302,7 +302,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         elif current_focus == "right":
             right_text_area.buffer.cursor_up(count=event.arg)
 
-    @kb.add("down")
+    @kb.add("down", filter=Condition(lambda: not is_diff_view))
     def _(event):
         nonlocal current_index
         if current_focus == "left":
@@ -572,7 +572,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             layout=layout,
             key_bindings=kb,
             style=viewer_style,
-            full_screen=True
+            full_screen=True,
+            input_timeout=0.05,  # Esc 응답 지연 최소화 (기본 500ms → 50ms)
         )
         result = await app.run_async()
 
