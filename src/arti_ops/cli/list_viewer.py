@@ -573,8 +573,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             key_bindings=kb,
             style=viewer_style,
             full_screen=True,
-            input_timeout=0.05,  # Esc 응답 지연 최소화 (기본 500ms → 50ms)
         )
+        app.timeoutlen = 0.05  # Esc 응답 지연 단축: 기본 500ms → 50ms
         result = await app.run_async()
 
         # u 키로 요청된 경우: 다이얼로그 실행 후 배지 갱신 후 늉어로 복귀
