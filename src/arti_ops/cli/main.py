@@ -227,19 +227,28 @@ async def run_interactive_loop(workspace: str, target_agent: str):
 
                 bookstack = BookStackToolset()
 
-                # upsert_plan 캐시 조회 (workspace 단위 키)
-                cached_plan_json = _viewer_cache.get("upsert_plan", workspace)
-                if cached_plan_json:
-                    plan = json.loads(cached_plan_json)
-                else:
-                    with console.status("[cyan]BookStack 위키와 로컬 현황을 비교 분석 중입니다...[/cyan]", spinner="dots"):
-                        try:
-                            plan = await bookstack.get_upsert_plan(workspace)
-                            _viewer_cache.set("upsert_plan", json.dumps(plan, ensure_ascii=False), workspace)
-                        except ValueError as e:
-                            console.print(f"\n[bold yellow]⚠ {e}[/bold yellow]")
+                # get_upsert_plan + fetch_policies("global"/"workspace") 병렬 사전 로딩
+                # → d(L2)/D(L1) 키 첫 입력 시 캐시 HIT으로 즉시 응답
+                with console.status("[cyan]BookStack 위키와 로컬 현황 및 L1/L2 정책을 병렬로 로드 중입니다...[/cyan]", spinner="dots"):
+                    try:
+                        plan, global_policies, workspace_policies = await asyncio.gather(
+                            bookstack.get_upsert_plan(workspace),
+                            bookstack.fetch_policies(scope_tag="global"),
+                            bookstack.fetch_policies(scope_tag="workspace", project_id=workspace)
+                        )
+                        _viewer_cache.set("upsert_plan", json.dumps(plan, ensure_ascii=False), workspace)
+                        _viewer_cache.set("global", global_policies)
+                        _viewer_cache.set("workspace", workspace_policies, workspace)
+                    except ValueError as e:
+                        console.print(f"\n[bold yellow]⚠ {e}[/bold yellow]")
+                        _viewer_cache.close()
+                        continue
+                    except Exception as e:
+                        console.print(f"\n[bold yellow]⚠ 정책 로드 실패 (Diff/파이프라인 기능 제한됨): {e}[/bold yellow]")
+                        if not plan:
                             _viewer_cache.close()
                             continue
+
 
                 # 룩업 딕셔너리 생성 (rel_path: action)
                 plan_lookup = {item["rel_path"]: item["action"] for item in plan}
@@ -256,6 +265,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
 
                 console.print("\n[bold cyan]✔ 로컬 현황 조회를 완료했습니다.[/bold cyan]")
                 continue
+
 
                 
             if not user_input:

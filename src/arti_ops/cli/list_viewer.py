@@ -291,15 +291,29 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             except Exception:
                 pass
 
-    # ─── Tab: 좌/우 포커스 전환 (EDIT 모드에서는 차단) ───
+    # ─── Tab: diff/L1/파이프라인 뷰 중이면 먼저 이탈, 이후 좌/우 포커스 전환 (EDIT 모드에서는 차단) ───
     @kb.add("tab", filter=Condition(lambda: not is_edit_mode))
     def _(event):
-        nonlocal current_focus
+        nonlocal current_focus, is_l1_preview, is_diff_view, is_pipeline_view
+        if is_l1_preview or is_diff_view or is_pipeline_view:
+            # Esc와 동일하게 원본 복원 후 포커스 전환
+            right_text_area.text = original_content
+            is_l1_preview = False
+            is_diff_view = False
+            is_pipeline_view = False
+            diff_text_area.text = ""
+            update_toolbar()
+            try:
+                get_app().layout.focus(right_text_area)
+            except Exception:
+                pass
+            return
         if current_focus == "left":
             current_focus = "right"
         else:
             current_focus = "left"
         update_toolbar()
+
 
     # ─── 방향키: 좌측 탐색 또는 우측 스크롤 (Diff 뷰 중에는 전얭 바인딩 실행 안 함) ───
     @kb.add("up", filter=Condition(lambda: not is_diff_view))
