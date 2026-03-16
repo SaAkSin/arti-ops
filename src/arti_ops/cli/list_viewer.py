@@ -254,7 +254,12 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             right_text_area.text = original_content
             is_l1_preview = False
             is_diff_view = False
+            diff_text_area.text = ""   # Diff 영역 졸울
             update_toolbar()
+            try:
+                get_app().layout.focus(right_text_area)
+            except Exception:
+                pass
         elif is_edit_mode:
             # 편집 취소: 원본 복원
             is_edit_mode = False
@@ -534,6 +539,12 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             diff_text_area.text = f"[Diff 실패: {e}]"
             is_diff_view = False
         update_toolbar()
+        # Diff 완료 후 diff_text_area로 포커스 이동 → 상/하 스크롤 활성화
+        if is_diff_view:
+            try:
+                get_app().layout.focus(diff_text_area)
+            except Exception:
+                pass
 
     # ─── Ctrl+C / CMD+C: 우측 패널 내용 클립보드 복사 (macOS pbcopy) ───
     @kb.add("c-c", filter=Condition(lambda: not is_edit_mode))
