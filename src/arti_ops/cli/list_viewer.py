@@ -333,13 +333,11 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             except Exception as e:
                 right_text_area.text = right_text_area.text + f"\n\n[저장 오류: {e}]"
 
-    # l/u 다이얼로그 색상 일치: 베이스 배경은 bg:#2b2b2b 사용
+    # l/u 다이얼로그 색상 일치: 두 구역 모두 터미널 기본 배경을 사용
     viewer_style = Style([
-        ('',               'bg:#2b2b2b #dddddd'),  # 전체 배경색 (u 다이얼로그와 동일)
         ('bottom-toolbar', 'bg:#333333 #ffffff'),
         ('selected',       'bg:#00aa00 #ffffff bold'),
         ('header',         'bold #00ffff'),
-        ('frame.border',   'bg:#2b2b2b #555555'),
     ])
 
     # ─── Application 루프: upsert 후 런타임에 재진입 ───

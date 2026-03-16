@@ -31,13 +31,10 @@ logger = logging.getLogger(__name__)
 app = CycloptsApp(name="arti-ops", help="로컬 컨텍스트 기반 AgentOps CLI")
 console = Console()
 
-# 하단 프롬프트바 및 다이얼로그 스타일 지정 (l 뷰어와 배경색 통일: bg:#2b2b2b)
+# 하단 프롬프트바 및 다이얼로그 스타일 지정 (l 뷰어와 배경색 일치: 터미널 기본 배경 사용)
 pt_style = Style.from_dict({
-    '':                   'bg:#2b2b2b #dddddd',  # 베이스 배경색 (l 뷰어와 동일)
     'bottom-toolbar':     'bg:#333333 #ffffff',
-    'dialog':             'bg:#2b2b2b',
-    'dialog frame.label': 'bg:#2b2b2b #00ffff bold',
-    'dialog.body':        'bg:#2b2b2b #dddddd',
+    'dialog frame.label': '#00ffff bold',       # 타이틀 색상만 유지 (배경 강제 없음)
     'dialog shadow':      'bg:#1a1a1a',
     'checkbox':           '#00ff00',
     'checkbox-checked':   '#00ff00 bold',
