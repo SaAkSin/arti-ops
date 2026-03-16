@@ -1,4 +1,4 @@
-# arti-ops v0.5.1 (AI AgentOps TUI 플랫폼)
+# arti-ops v0.5.2 (AI AgentOps TUI 플랫폼)
 
 `arti-ops`는 사내 BookStack(위키)에 정의된 20개 이상의 다중 프로젝트 가이드라인과 전사(Global) 보안 정책을 개발자의 로컬 환경과 **자동으로 융합(Soft-Merge)** 및 배포하는 **지능형 전체화면 TUI 클라이언트**입니다.
 > **⚠️ 주의:** 이 플랫폼은 아트그래머(ARTGRAMMER) 내부 개발실의 **프로토타입(Prototype) 프로젝트**이며, Google DeepMind의 **`antigravity` 에이전트 전용**으로 설계되었습니다. 다른 에이전트 모델 또는 일반 챗봇 시스템에서는 정상적인 정책 동기화 및 파이프라인 수행을 보장하지 않습니다.

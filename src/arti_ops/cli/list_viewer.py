@@ -369,12 +369,26 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         asyncio.ensure_future(_do_l1_convert())
 
     async def _do_l1_convert():
-        """ADK globalizer 에이전트로 L3 콘텐츠를 L1 전역 정첵으로 일반화한다."""
+        """ADK globalizer 에이전트로 L3 콘텐츠를 L1 전역 정책으로 일반화한다."""
         nonlocal is_l1_preview, original_content
         original_content = right_text_area.text
-        right_text_area.text = "⏳ L1 정첵으로 변환 중... (Gemini PRO 모델 사용)"
+        right_text_area.text = "변환 중..."
         is_l1_preview = True
-        update_toolbar()
+
+        # ── toolbar 스피너: |/-\\ 프레임을 0.12초 주기로 회전 ──
+        frames = ["|", "/", "-", "\\"]
+        spinner_running = True
+
+        async def _spinner():
+            i = 0
+            while spinner_running:
+                toolbar_text_control.text = (
+                    f" [L1 변환 중 {frames[i % 4]}  |  Esc: 취소]"
+                )
+                i += 1
+                await asyncio.sleep(0.12)
+
+        spinner_task = asyncio.ensure_future(_spinner())
         try:
             runner = Runner(
                 app_name="l1-globalizer",
@@ -387,7 +401,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 user_id="viewer",
                 session_id="l1_convert",
                 new_message=Content(role="user", parts=[
-                    Part.from_text(text=f"다음 L3 콘텐츠를 L1 전역 정첵으로 변환해주세요:\n\n{original_content}")
+                    Part.from_text(text=f"다음 L3 콘텐츠를 L1 전역 정책으로 변환해주세요:\n\n{original_content}")
                 ])
             ):
                 if event.is_final_response():
@@ -396,6 +410,9 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         except Exception as e:
             right_text_area.text = f"[변환 실패: {e}]\n\n{original_content}"
             is_l1_preview = False
+        finally:
+            spinner_running = False
+            spinner_task.cancel()
         update_toolbar()
 
     # ─── Ctrl+C / CMD+C: 우측 패널 내용 클립보드 복사 (macOS pbcopy) ───

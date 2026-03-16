@@ -3,33 +3,32 @@
 모든 변경 사항은 이 파일에 기록됩니다.
 이 프로젝트는 유의적 버전(Semantic Versioning)을 따릅니다.
 
-## [Unreleased]
+## [0.5.2] - 2026-03-16
 
 ### Added
 
-- `list_viewer.py` `l` 뷰어에 `u` 키로 BookStack Upsert 기능 직접 통합: `checkboxlist_dialog`로 항목 선택 후 배포. 배포 완료 항목 배지 즉시 `Match`로 갱신. toolbar에 `u: 위키 배포` 힌트 자동 표시.
-- `list_viewer.py` 함수 시그니처에 `full_plan`, `bookstack`, `upsert_style` 추가, `main.py` 호출부에 `pt_style` 전달하여 `u`/`l` 다이얼로그 색상 일치.
-
-- `tests/test_architect.py`, `tests/test_profiler.py` 낡은 instruction 문자열 검증을 현재 코드 기준으로 갱신
-- `u` (upsert) 명령어를 통한 로컬 에셋(규칙, 스킬)의 BookStack 대화형 동기화 기능 추가 (체크박스 다이얼로그 지원)
-- 대화형 TUI 환경(Native IME 기반) 도입 및 `rich`, `prompt_toolkit` 마이그레이션 적용
-- `r` (reset) 명령어를 통한 `sessions.db` 캐시 명시적 초기화 기능 추가
+- `agents/globalizer.py` L1 전역 정책 변환 전용 ADK `LlmAgent` 신규 추가 (Gemini PRO 모델; Scripts 섹션 예제화 규칙 포함)
+- `list_viewer.py` `g` 키: 현재 선택 파일을 L1 전역 정책으로 변환하여 우측 패널에 미리보기. `Esc`로 원본 복원. Toolbar 스피너(`|/-\`) 애니메이션 표시.
+- `list_viewer.py` `Ctrl+C` / `⌘+C`: 우측 패널 내용을 macOS 클립보드(`pbcopy`)에 복사
+- `list_viewer.py` `l` 뷰어 최초 진입 시 첫 유효 항목 자동 미리보기 로드
+- `list_viewer.py` 인라인 파일 편집 기능 추가 (`Enter`: 편집 모드 진입, `Ctrl+S`: 저장, `Esc`: 취소)
+- `list_viewer.py` `l` 뷰어 내 `u` 키로 BookStack Upsert 기능 직접 통합
 
 ### Changed
 
-- 위키 연동 현황 표기를 단순 파일 유무 방식(`N`, `U`)에서 실제 마크다운 내용 1:1 병렬 대조(Match) 방식으로 고도화하고, 직관적인 신규 심볼(`!` 신규, `*` 변경됨, ` ` 완벽 일치/수정불필요) 도입
-- `u` (upsert) 명령어 체크박스 다이얼로그의 색상을 터미널 기본 다크 테마와 이질감 없게 조화로운 배색으로 스타일링 통합
-- CLI 콘솔 내 호환성 및 출력 깨짐 문제를 해결하기 위해 시스템 안내 메시지 및 트리의 모든 이모지 기호를 모던 기하학 ASCII 도형(▶, ■, ◎, √ 등)으로 전면 교체
-- BookStack API 호출 등 동기화 관련 장기 대기 프로세스들에 `rich.console.status` 기반의 동적 로딩 스피너(dots) 애니메이션 일괄 적용
-- GWS Chat 통신을 중간 대기 방식에서 배포 성공 후 단방향 요약 송신 방식으로 간소화
-- `.agents/rules/`의 경우 `[Name].md`, `.agents/skills/`의 경우 `[Name]/SKILL.md` 디렉토리 구조 생성으로 매핑 로직 분리
+- `list_viewer.py` `↑`/`↓` 이동 시 자동 미리보기 (Space 키 제거)
+- `list_viewer.py` `Enter` 뷰어 종료 기능 제거 → 좌측 패널 `Enter`로 즉시 편집 모드 진입
+- `list_viewer.py` `Tab` 키: EDIT 모드에서 포커스 이동 차단 (타이핑 오동작 버그 수정)
+- `list_viewer.py` `u` 체크박스에서 위키와 동일한 `Match` 항목 필터링 (배포 불필요 항목 제외)
+- `main.py`/`list_viewer.py` `u`/`l` 다이얼로그 배경색 터미널 기본값으로 통일 (강제 dark bg 제거)
+- `main.py`/`list_viewer.py` `u` 실행 패턴을 `app.exit` + Application 루프 재진입 방식으로 전환 (두 Application 충돌 버그 수정)
 
 ### Fixed
 
+- `bookstack.py` `execute_upsert()` 내 미정의 `console` 참조 2곳 → `logger`로 교체 (`NameError` 방지)
 - `gws_chat.py` `send_summary()` 내 미존재 속성 `self.gws_space_id` 참조를 올바른 `self.check_room_id`로 수정 (런타임 `AttributeError` 방지)
 - `pipeline.py` `resume()` 메서드 중복 정의(L61) 제거, 인자명 `action_response`로 통일
 - `agents/verifier.py`, `agents/executor.py` 중복 `import get_config` 라인 제거
-- `tools/bookstack.py` 미정의 `console` 객체 사용 2곳 → `logger.error()` / `logger.warning()`으로 대체 (NameError 방지)
 - `tests/test_pipeline.py` 삭제된 `pipeline.sandbox_tool` assertion 제거
 - `tests/test_gws_chat.py` 존재하지 않는 `request_approval()`, `run()` 메서드 호출을 실제 `send_summary()` 기반으로 재작성
-- `tests/test_verifier.py`, `tests/test_executor.py` 낡은 instruction 문자열 검증 구문을 현재 코드 기준으로 갱신
+- `tests/test_verifier.py`, `tests/test_executor.py`, `tests/test_architect.py`, `tests/test_profiler.py` 낡은 instruction 검증 구문을 현재 코드 기준으로 갱신

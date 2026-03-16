@@ -1,4 +1,4 @@
-# 🛠️ [SSD] arti-ops v0.5.1 시스템 및 서비스 명세서 (개정판)
+# 🛠️ [SSD] arti-ops v0.5.2 시스템 및 서비스 명세서 (개정판)
 
 ## 1. 시스템 아키텍처 개요
 
@@ -20,6 +20,15 @@
   ├── 📚 BookStackToolset : 정책 Fetch 전용
   ├── 📂 FileIOToolset : 로컬 파일 읽기(컨텍스트 수집) 및 쓰기(최종 배포)
   └── 💬 GwsSummaryTool : 배포 완료 후 단방향 요약 알림 전송 (Pause 기능 완전 제거)
+
+[ L Viewer Layer (list_viewer.py) ]
+  ├── 좌측 패널: .agents/ 파일 목록 + 배지(!/*/공백) 표시
+  ├── 우측 패널: 파일 미리보기 / 인라인 편집 / L1 변환 결과 표시
+  ├── g 키: l1_globalizer Agent(PRO 모델) 호출 → L1 변환 미리보기
+  └── u 키: BookStack Upsert 체크박스 다이얼로그 (Match 항목 자동 제외)
+
+[ L1 Globalizer Agent (agents/globalizer.py) ]
+  └── 🌐 L1Globalizer : L3 프로젝트 전용 규칙/스킬 → L1 글로벌 정책 변환 (PRO 모델, Scripts 예제화 포함)
 
 ```
 
