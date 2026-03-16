@@ -186,9 +186,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
 
     right_text_area.buffer.on_text_changed += on_text_changed
 
-    # ─── 종료: READ 모드에서만 동작 ───
+    # ─── 종료: READ 모드에서 q만 동작 (Enter는 편집 모드 진입으로 재정의) ───
     @kb.add("q", filter=Condition(lambda: not is_edit_mode))
-    @kb.add("enter", filter=Condition(lambda: not is_edit_mode))
     def _(event):
         try:
             event.app.exit()
@@ -234,6 +233,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             while next_idx >= 0:
                 if items[next_idx][1]:
                     current_index = next_idx
+                    _load_preview()      # ─ 자동 미리보기
                     update_left_pane()
                     break
                 next_idx -= 1
@@ -248,6 +248,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             while next_idx < len(items):
                 if items[next_idx][1]:
                     current_index = next_idx
+                    _load_preview()      # ─ 자동 미리보기
                     update_left_pane()
                     break
                 next_idx += 1
@@ -281,19 +282,31 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         """l 뷰어를 일시 종료 후 upsert 다이얼로그를 실행하고 발어 재진입한다."""
         event.app.exit(result="upsert_requested")
 
-    # ─── Space: 파일 미리보기 로드 ───
-    @kb.add("space", filter=Condition(lambda: not is_edit_mode))
-    def _(event):
+    # ─── _load_preview: 파일 로드 헬퍼 (자동 미리보기 및 Enter 진입에서 공유) ───
+    def _load_preview():
+        """items[current_index]의 파일을 우측 패널에 로드한다."""
         nonlocal active_file_path
         _, path = items[current_index]
         if path and os.path.exists(path):
             active_file_path = path
             try:
                 with open(path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                right_text_area.text = content
+                    right_text_area.text = f.read()
             except Exception as e:
-                right_text_area.text = f"파일을 읽는 중 오류가 발생했습니다: {e}"
+                right_text_area.text = f"파일을 읽는 중 오류: {e}"
+
+    # ─── Enter (좌측): 파일 로드 + 즉시 EDIT 모드 진입 ───
+    @kb.add("enter", filter=Condition(
+        lambda: not is_edit_mode and current_focus == "left"
+    ))
+    def enter_to_edit(event):
+        nonlocal current_focus, is_edit_mode
+        _load_preview()
+        if active_file_path is not None:  # 파일이 로드된 경우에만 편집 모드 진입
+            current_focus = "right"
+            is_edit_mode = True
+            right_text_area.buffer.read_only = to_filter(False)
+            update_toolbar()
 
     # ─── e: EDIT 모드 진입 (우측 포커스 + 파일이 열린 경우에 한정) ───
     @kb.add("e", filter=Condition(
