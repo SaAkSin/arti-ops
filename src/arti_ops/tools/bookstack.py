@@ -431,8 +431,8 @@ class BookStackToolset(BaseToolset):
                         res = await client.put(url, headers=headers, json=payload)
                         res.raise_for_status()
                         logger.info(f"Updated page: {item['name']}")
-                        console.print(f"[blue]▶ BookStack 페이지 업데이트 완료:[/blue] {item['name']} (ID: {item['page_id']})")
+                        logger.info(f"BookStack 페이지 업데이트 완료: {item['name']} (ID: {item['page_id']})")
                 except Exception as e:
                     logger.error(f"Failed to {item['action']} page {item['name']}: {e}")
-                    console.print(f"[bold red]✖ Upsert 실패: {item['name']} (BookStack API 에러)[/bold red]")
+                    logger.error(f"Upsert 실패: {item['name']} (BookStack API 에러)")
 
