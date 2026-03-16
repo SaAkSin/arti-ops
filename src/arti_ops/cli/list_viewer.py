@@ -272,53 +272,14 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     def _(event):
         pass  # no-op으로 소비
 
-    # ─── u: Upsert (full_plan과 bookstack이 있을 때만 활성화) ───
+    # ─── u: Upsert ↔ l 다시 진입하는 복귀 패턴 ───
+    # asyncio.ensure_future 대신 app.exit 해서 다이얼로그를 같은 Application 실행에서 릹지 않게 함.
     @kb.add("u", filter=Condition(
         lambda: full_plan is not None and bookstack is not None and not is_edit_mode
     ))
     def trigger_upsert(event):
-        """l 뷰어 내부에서 u 키로 BookStack Upsert를 실행한다."""
-        async def _do_upsert():
-            def get_symbol(action):
-                return {"Create": "!", "Update": "*", "Match": " "}.get(action, " ")
-
-            choices = []
-            for item in full_plan:
-                display_text = f"[{get_symbol(item['action'])}] {item['rel_path']}"
-                # skills 부속 파일 안내 추가
-                if item.get("type") == "skills":
-                    skill_dir = os.path.join(os.getcwd(), os.path.dirname(item["rel_path"]))
-                    if os.path.exists(skill_dir):
-                        for root, _, files in os.walk(skill_dir):
-                            for file in sorted(files):
-                                if file == "SKILL.md" or file.startswith(".") or file.endswith(".pyc"):
-                                    continue
-                                sub_path = os.path.join(root, file)
-                                rel_sub = os.path.relpath(sub_path, skill_dir)
-                                display_text += f"\n      ↳ {rel_sub}"
-                choices.append((item, display_text))
-
-            selected = await asyncio.to_thread(
-                checkboxlist_dialog(
-                    title="위키 연동 (BookStack Upsert)",
-                    text=(
-                        "방향키(↑/↓)와 스페이스바(Space)로 배포할 항목을 선택하세요.\n"
-                        "[ ! : 신규 추가 | * : 위키와 로컈 내용 다름 (업데이트 대상) | 공백 : 컨텐츠 완전 동일 (수정 불필요) ]"
-                    ),
-                    values=choices,
-                    style=upsert_style
-                ).run
-            )
-
-            if selected:
-                await bookstack.execute_upsert(selected)
-                # 배포된 항목 배지 갱신: 위키에 업로드되었으므로 Match로 표시
-                for item in selected:
-                    plan_lookup[item["rel_path"]] = "Match"
-                rebuild_items_badges()
-                update_left_pane()
-
-        asyncio.ensure_future(_do_upsert())
+        """l 뷰어를 일시 종료 후 upsert 다이얼로그를 실행하고 발어 재진입한다."""
+        event.app.exit(result="upsert_requested")
 
     # ─── Space: 파일 미리보기 로드 ───
     @kb.add("space", filter=Condition(lambda: not is_edit_mode))
@@ -372,17 +333,68 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             except Exception as e:
                 right_text_area.text = right_text_area.text + f"\n\n[저장 오류: {e}]"
 
-    style = Style([
+    # l/u 다이얼로그 색상 일치: 베이스 배경은 bg:#2b2b2b 사용
+    viewer_style = Style([
+        ('',               'bg:#2b2b2b #dddddd'),  # 전체 배경색 (u 다이얼로그와 동일)
         ('bottom-toolbar', 'bg:#333333 #ffffff'),
-        ('selected', 'bg:#00aa00 #ffffff bold'),
-        ('header', 'bold #00ffff'),
+        ('selected',       'bg:#00aa00 #ffffff bold'),
+        ('header',         'bold #00ffff'),
+        ('frame.border',   'bg:#2b2b2b #555555'),
     ])
 
-    app = Application(
-        layout=layout,
-        key_bindings=kb,
-        style=style,
-        full_screen=True
-    )
+    # ─── Application 루프: upsert 후 런타임에 재진입 ───
+    # Application 인스턴스는 재사용이 불가하므로 루프 내에서 매번 생성
+    while True:
+        app = Application(
+            layout=layout,
+            key_bindings=kb,
+            style=viewer_style,
+            full_screen=True
+        )
+        result = await app.run_async()
 
-    await app.run_async()
+        # u 키로 요청된 경우: 다이얼로그 실행 후 배지 갱신 후 늉어로 복귀
+        if result == "upsert_requested" and full_plan and bookstack:
+            def get_symbol(action):
+                return {"Create": "!", "Update": "*", "Match": " "}.get(action, " ")
+
+            choices = []
+            for item in full_plan:
+                display_text = f"[{get_symbol(item['action'])}] {item['rel_path']}"
+                if item.get("type") == "skills":
+                    skill_dir = os.path.join(os.getcwd(), os.path.dirname(item["rel_path"]))
+                    if os.path.exists(skill_dir):
+                        for root, _, files in os.walk(skill_dir):
+                            for file in sorted(files):
+                                if file == "SKILL.md" or file.startswith(".") or file.endswith(".pyc"):
+                                    continue
+                                sub_path = os.path.join(root, file)
+                                rel_sub = os.path.relpath(sub_path, skill_dir)
+                                display_text += f"\n      ↳ {rel_sub}"
+                choices.append((item, display_text))
+
+            # 다이얼로그를 Application 밖에서 (실행 중인 App 없음) 실행 → 스타일 정상 적용
+            selected = await asyncio.to_thread(
+                checkboxlist_dialog(
+                    title="위키 연동 (BookStack Upsert)",
+                    text=(
+                        "방향키(↑/↓)와 스페이스바(Space)로 배포할 항목을 선택하세요.\n"
+                        "[ ! : 신규 추가 | * : 위키와 로컈 내용 다름 (업데이트 대상) | 공백 : 컨텐츠 완전 동일 (수정 불필요) ]"
+                    ),
+                    values=choices,
+                    style=upsert_style
+                ).run
+            )
+
+            if selected:
+                await bookstack.execute_upsert(selected)
+                for item in selected:
+                    plan_lookup[item["rel_path"]] = "Match"
+                rebuild_items_badges()
+                update_left_pane()
+
+            # 선택함/안 함/취소 모두 누어로 복귀
+            continue
+
+        # q/Esc/Enter 등 일반 종료 → 루프 탈출
+        break

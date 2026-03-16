@@ -31,17 +31,18 @@ logger = logging.getLogger(__name__)
 app = CycloptsApp(name="arti-ops", help="로컬 컨텍스트 기반 AgentOps CLI")
 console = Console()
 
-# 하단 프롬프트바 및 다이얼로그 스타일 지정 (기본 터미널 테마와 유사하게 배색)
+# 하단 프롬프트바 및 다이얼로그 스타일 지정 (l 뷰어와 배경색 통일: bg:#2b2b2b)
 pt_style = Style.from_dict({
-    'bottom-toolbar': 'bg:#333333 #ffffff',
-    'dialog': 'bg:#2b2b2b',
+    '':                   'bg:#2b2b2b #dddddd',  # 베이스 배경색 (l 뷰어와 동일)
+    'bottom-toolbar':     'bg:#333333 #ffffff',
+    'dialog':             'bg:#2b2b2b',
     'dialog frame.label': 'bg:#2b2b2b #00ffff bold',
-    'dialog.body': 'bg:#2b2b2b #dddddd',
-    'dialog shadow': 'bg:#1a1a1a',
-    'checkbox': '#00ff00',
-    'checkbox-checked': '#00ff00 bold',
-    'button': 'bg:#444444 #ffffff',
-    'button.focused': 'bg:#00aa00 #ffffff bold',
+    'dialog.body':        'bg:#2b2b2b #dddddd',
+    'dialog shadow':      'bg:#1a1a1a',
+    'checkbox':           '#00ff00',
+    'checkbox-checked':   '#00ff00 bold',
+    'button':             'bg:#444444 #ffffff',
+    'button.focused':     'bg:#00aa00 #ffffff bold',
 })
 
 async def handle_chat_query(user_input: str, workspace: str, console):
