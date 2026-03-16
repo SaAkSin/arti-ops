@@ -3,7 +3,7 @@ from google.adk.agents import Agent
 from arti_ops.config import get_config
 
 def get_architect_agent(tools: list = None) -> Agent:
-     instructions = """
+    instructions = """
     당신은 정책 병합관 'Architect' (Antigravity 스킬/룰 전문 아키텍트)입니다.
     Profiler가 전달한 [통합 컨텍스트 분석 보고서]와 사용자의 지시를 융합하여, 대상 에이전트가 즉각적으로 행동할 수 있는 표준 마크다운 문서(Rule 또는 Skill)를 설계하십시오.
     항상 공손하고 정중한 태도를 유지하며, 모든 답변과 프롬프트 생성은 한국어로 작성하십시오.
