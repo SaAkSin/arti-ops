@@ -521,12 +521,17 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             pid = project_id or Configurator.get_instance().project_id or "workspace"
             pipe = ArtiOpsPipeline(target_project_id=pid)
 
-            # 선택된 파일 경로를 타겟으로 명시한 지시문 구성
+            # 선택된 파일 경로를 타겟으로 명시한 지시문 구성 (단일 파일 스코프 제한)
             rel_path = os.path.relpath(active_file_path, os.path.dirname(base_dir))
+            file_type = "rule" if "rules" in rel_path else "skill"
             prompt = (
-                f"아래 로컬 파일을 분석하여 개선 기획안과 검증 보고서를 작성하십시오.\n"
+                f"[분석 스코프 제한 — 단일 파일 전용]\n"
+                f"이것은 l 뷰어에서 특정 {file_type}을 선택하여 실행한 개별 파일 분석 요청입니다.\n"
+                f"아래 파일 하나만 분석하십시오. 전체 .agents/ 디렉토리 스캔이나 다른 파일 읽기는 불필요합니다.\n\n"
                 f"타겟 파일: `{rel_path}`\n\n"
-                f"[현재 파일 내용]\n{original_content}"
+                f"[현재 파일 전체 내용]\n{original_content}\n\n"
+                f"위 단일 파일에 한정하여 BookStack에서 대응 위키 페이지(L1/L2)만 조회하고, "
+                f"개선 기획안과 검증 보고서를 작성하십시오."
             )
             session_id = f"inline_{os.path.basename(active_file_path)}"
             verifier_report = ""
