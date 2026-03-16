@@ -459,7 +459,7 @@ def setup():
     
     cred_file = home_dir / "credentials"
     if cred_file.exists():
-        console.print("┣ [yellow]기존 인증 정보가 존재합니다. 새로 입력하여 덮어씁니다.[/yellow]")
+        console.print("┣ [yellow]기존 인증 정보가 존재합니다. 새로 입력하여 덮어씁니다 (모델 설정도 최신값으로 갱신됩니다).[/yellow]")
         
     try:
         from prompt_toolkit import prompt
@@ -472,8 +472,8 @@ def setup():
         with open(cred_file, "w") as f:
             f.write("[default]\n")
             f.write(f"GEMINI_API_KEY={gemini_key}\n")
-            f.write("GEMINI_MODEL_PRO=gemini-2.5-pro\n")
-            f.write("GEMINI_MODEL_FLASH=gemini-2.5-flash\n")
+            f.write("GEMINI_MODEL_PRO=gemini-3.1-pro-preview\n")
+            f.write("GEMINI_MODEL_FLASH=gemini-flash-latest\n")
             f.write(f"BOOKSTACK_API_URL={bs_url}\n")
             f.write(f"BOOKSTACK_TOKEN_ID={bs_id}\n")
             f.write(f"BOOKSTACK_TOKEN_SECRET={bs_secret}\n")
