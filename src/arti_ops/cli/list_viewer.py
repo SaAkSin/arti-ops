@@ -1,5 +1,6 @@
 import os
 import asyncio
+import subprocess
 from prompt_toolkit.application import Application
 from prompt_toolkit.layout.containers import HSplit, VSplit, Window
 from prompt_toolkit.layout.controls import FormattedTextControl
@@ -9,6 +10,10 @@ from prompt_toolkit.filters import Condition, to_filter
 from prompt_toolkit.shortcuts import checkboxlist_dialog
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
+from google.adk import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai.types import Content, Part
+from arti_ops.agents.globalizer import get_globalizer_agent
 
 
 async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None, upsert_style=None):
@@ -77,6 +82,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     is_edit_mode = False      # 편집 모드 여부
     is_dirty = False          # 미저장 변경 여부
     active_file_path = None   # 현재 우측 패널에 열린 파일 경로
+    is_l1_preview = False     # L1 변환 미리보기 표시 중인지 여부
+    original_content = ""     # L1 미리보기 Esc 복원용 원본 내용
 
     # 처음에 포커스 가능한 아이템 찾기
     for i, (_, path) in enumerate(items):
@@ -141,13 +148,17 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             toolbar_text_control.text = (
                 " [Ctrl+S: 저장 | Esc: 편집 취소 | 내용 자유 수정 가능]"
             )
+        elif is_l1_preview:
+            toolbar_text_control.text = (
+                " [L1 변환 미리보기 중 | Ctrl+C / ⌘+C: 클립보드 복사 | Esc: 원본 복원]"
+            )
         elif current_focus == "right":
             toolbar_text_control.text = (
-                f" [e: 편집 모드 | ↑/↓: 텍스트 스크롤 | Tab: 뷰 전환{upsert_hint} | q/Esc/Enter: 닫기]"
+                f" [e: 편집 | g: L1 변환 | Ctrl+C: 복사 | ↑/↓: 스크롤 | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
             )
         else:
             toolbar_text_control.text = (
-                f" [↑/↓: 이동 | Space: 미리보기 | Tab: 뷰 전환{upsert_hint} | q/Esc/Enter: 닫기]"
+                f" [↑/↓: 이동+미리보기 | Enter: 편집 | g: L1 변환 | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
             )
 
     def get_right_panel_title():
@@ -194,11 +205,16 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         except Exception:
             pass
 
-    # ─── Esc: EDIT 모드이면 편집 취소, READ 모드이면 뷰어 종료 ───
+    # ─── Esc: L1 미리보기 복원 → EDIT 취소 → 뷰어 종료 순으로 처리 ───
     @kb.add("escape")
     def _(event):
-        nonlocal is_edit_mode, is_dirty
-        if is_edit_mode:
+        nonlocal is_edit_mode, is_dirty, is_l1_preview
+        if is_l1_preview:
+            # L1 미리보기 중: 원본 복원
+            right_text_area.text = original_content
+            is_l1_preview = False
+            update_toolbar()
+        elif is_edit_mode:
             # 편집 취소: 원본 복원
             is_edit_mode = False
             is_dirty = False
@@ -214,8 +230,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             except Exception:
                 pass
 
-    # ─── Tab: 좌/우 포커스 전환 ───
-    @kb.add("tab")
+    # ─── Tab: 좌/우 포커스 전환 (EDIT 모드에서는 차단) ───
+    @kb.add("tab", filter=Condition(lambda: not is_edit_mode))
     def _(event):
         nonlocal current_focus
         if current_focus == "left":
@@ -346,12 +362,60 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             except Exception as e:
                 right_text_area.text = right_text_area.text + f"\n\n[저장 오류: {e}]"
 
+    # ─── g: L1 변환 미리보기 (ADK LlmAgent 기반) ───
+    @kb.add("g", filter=Condition(lambda: not is_edit_mode and active_file_path is not None))
+    def trigger_l1_convert(event):
+        """g 키: 현재 파일을 L1 전역 정첵으로 변환하여 우측 패널에 표시한다."""
+        asyncio.ensure_future(_do_l1_convert())
+
+    async def _do_l1_convert():
+        """ADK globalizer 에이전트로 L3 콘텐츠를 L1 전역 정첵으로 일반화한다."""
+        nonlocal is_l1_preview, original_content
+        original_content = right_text_area.text
+        right_text_area.text = "⏳ L1 정첵으로 변환 중... (Gemini PRO 모델 사용)"
+        is_l1_preview = True
+        update_toolbar()
+        try:
+            runner = Runner(
+                app_name="l1-globalizer",
+                agent=get_globalizer_agent(),
+                session_service=InMemorySessionService(),
+                auto_create_session=True
+            )
+            parts = []
+            async for event in runner.run_async(
+                user_id="viewer",
+                session_id="l1_convert",
+                new_message=Content(role="user", parts=[
+                    Part.from_text(text=f"다음 L3 콘텐츠를 L1 전역 정첵으로 변환해주세요:\n\n{original_content}")
+                ])
+            ):
+                if event.is_final_response():
+                    parts = event.content.parts if event.content else []
+            right_text_area.text = "\n".join(p.text for p in parts if hasattr(p, "text")) or "[변환 결과 없음]"
+        except Exception as e:
+            right_text_area.text = f"[변환 실패: {e}]\n\n{original_content}"
+            is_l1_preview = False
+        update_toolbar()
+
+    # ─── Ctrl+C / CMD+C: 우측 패널 내용 클립보드 복사 (macOS pbcopy) ───
+    @kb.add("c-c", filter=Condition(lambda: not is_edit_mode))
+    @kb.add("c-@", filter=Condition(lambda: not is_edit_mode))  # macOS ⌘+C 바인딩
+    def copy_to_clipboard(event):
+        """READ/L1 미리보기 모드에서 Ctrl+C / ⌘+C 로 우측 패널 내용을 클립보드에 복사한다."""
+        content = right_text_area.text
+        if content:
+            subprocess.run(["pbcopy"], input=content, text=True, check=False)
+
     # l/u 다이얼로그 색상 일치: 두 구역 모두 터미널 기본 배경을 사용
     viewer_style = Style([
         ('bottom-toolbar', 'bg:#333333 #ffffff'),
         ('selected',       'bg:#00aa00 #ffffff bold'),
         ('header',         'bold #00ffff'),
     ])
+
+    # ─── 초기 자동 로드: 첫 유효 항목을 우측 패널에 자동 표시 ───
+    _load_preview()
 
     # ─── Application 루프: upsert 후 런타임에 재진입 ───
     # Application 인스턴스는 재사용이 불가하므로 루프 내에서 매번 생성
