@@ -24,8 +24,10 @@ from prompt_toolkit.formatted_text import HTML
 
 from ..core.pipeline import ArtiOpsPipeline
 from ..tools.bookstack import BookStackToolset
+import json
 from .list_viewer import run_list_viewer
-from arti_ops.config import Configurator
+from arti_ops.core.policy_cache import PolicyCache
+from arti_ops.config import Configurator, get_db_url
 
 logger = logging.getLogger(__name__)
 
@@ -218,29 +220,43 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                 if not os.path.exists(base_dir):
                     console.print("\n[yellow]▼ 현재 로컬에 수집/배포된 룰이나 스킬이 없습니다. (.agents 폴더 없음)[/yellow]")
                     continue
-                
+
+                # 세션 캐시 초기화 (이전 세션 잔여 데이터 제거)
+                _viewer_cache = PolicyCache(get_db_url())
+                _viewer_cache.clear()
+
                 bookstack = BookStackToolset()
-                with console.status("[cyan]BookStack 위키와 로컬 현황을 비교 분석 중입니다...[/cyan]", spinner="dots"):
-                    try:
-                        plan = await bookstack.get_upsert_plan(workspace)
-                    except ValueError as e:
-                        console.print(f"\n[bold yellow]⚠ {e}[/bold yellow]")
-                        continue
-                
+
+                # upsert_plan 캐시 조회 (workspace 단위 키)
+                cached_plan_json = _viewer_cache.get("upsert_plan", workspace)
+                if cached_plan_json:
+                    plan = json.loads(cached_plan_json)
+                else:
+                    with console.status("[cyan]BookStack 위키와 로컬 현황을 비교 분석 중입니다...[/cyan]", spinner="dots"):
+                        try:
+                            plan = await bookstack.get_upsert_plan(workspace)
+                            _viewer_cache.set("upsert_plan", json.dumps(plan, ensure_ascii=False), workspace)
+                        except ValueError as e:
+                            console.print(f"\n[bold yellow]⚠ {e}[/bold yellow]")
+                            _viewer_cache.close()
+                            continue
+
                 # 룩업 딕셔너리 생성 (rel_path: action)
                 plan_lookup = {item["rel_path"]: item["action"] for item in plan}
-                
-                # 대화형 List Viewer 실행 (full_plan·bookstack·pt_style 전달로 u 기능 통합)
+
+                # 대화형 List Viewer 실행 — 캐시 인스턴스 주입
                 await run_list_viewer(
                     plan_lookup, base_dir,
                     full_plan=plan,
                     bookstack=bookstack,
                     upsert_style=pt_style,
-                    project_id=workspace
+                    project_id=workspace,
+                    policy_cache=_viewer_cache
                 )
-                
+
                 console.print("\n[bold cyan]✔ 로컬 현황 조회를 완료했습니다.[/bold cyan]")
                 continue
+
                 
             if not user_input:
                 continue
@@ -458,31 +474,55 @@ def setup():
     home_dir.mkdir(parents=True, exist_ok=True)
     
     cred_file = home_dir / "credentials"
+    
+    # 기존 credentials 로드 (있으면 기본값으로 사용)
+    import configparser
+    existing = {}
     if cred_file.exists():
-        console.print("┣ [yellow]기존 인증 정보가 존재합니다. 새로 입력하여 덮어씁니다 (모델 설정도 최신값으로 갱신됩니다).[/yellow]")
+        console.print("┣ [yellow]기존 인증 정보가 존재합니다. 엔터를 누르면 기존 값을 유지합니다 (모델 설정은 최신값으로 자동 갱신됩니다).[/yellow]")
+        parser = configparser.ConfigParser()
+        parser.read(cred_file)
+        if 'default' in parser:
+            existing = dict(parser['default'])
         
     try:
         from prompt_toolkit import prompt
-        gemini_key = prompt("┃ ❯ Gemini API KeY: ", is_password=True).strip()
-        bs_url = prompt("┃ ❯ BookStack API URL (ex: https://wiki.ok.com/api): ").strip()
-        bs_id = prompt("┃ ❯ BookStack Token ID: ").strip()
-        bs_secret = prompt("┃ ❯ BookStack Token Secret (pwd): ", is_password=True).strip()
-        use_gws = prompt("┃ ❯ USE GWS CLI(y/n)? [n]: ").strip().lower() == 'y'
+        
+        def _prompt(label: str, key: str, is_password: bool = False) -> str:
+            """기존 값이 있으면 기본값으로 표시하고, 엔터 시 그대로 유지한다."""
+            current = existing.get(key.lower(), "")
+            placeholder = f"[현재: {'****' if is_password and current else current or '미설정'}]"
+            new_val = prompt(f"┃ ❯ {label} {placeholder}: ", is_password=is_password).strip()
+            return new_val if new_val else current  # 엔터면 기존 값 유지
+
+        gemini_key = _prompt("Gemini API Key", "GEMINI_API_KEY", is_password=True)
+        bs_url     = _prompt("BookStack API URL (ex: https://wiki.ok.com/api)", "BOOKSTACK_API_URL")
+        bs_id      = _prompt("BookStack Token ID", "BOOKSTACK_TOKEN_ID")
+        bs_secret  = _prompt("BookStack Token Secret", "BOOKSTACK_TOKEN_SECRET", is_password=True)
+        
+        # GWS: y/n 입력 없으면 기존 값 유지
+        current_gws = existing.get("use_gws_cli", "false")
+        gws_input = prompt(f"┃ ❯ USE GWS CLI(y/n)? [현재: {current_gws}]: ").strip().lower()
+        if gws_input in ('y', 'n'):
+            use_gws_str = 'true' if gws_input == 'y' else 'false'
+        else:
+            use_gws_str = current_gws
         
         with open(cred_file, "w") as f:
             f.write("[default]\n")
             f.write(f"GEMINI_API_KEY={gemini_key}\n")
-            f.write("GEMINI_MODEL_PRO=gemini-3.1-pro-preview\n")
-            f.write("GEMINI_MODEL_FLASH=gemini-flash-latest\n")
+            f.write("GEMINI_MODEL_PRO=gemini-3.1-pro-preview\n")   # 항상 최신값으로 갱신
+            f.write("GEMINI_MODEL_FLASH=gemini-flash-latest\n")     # 항상 최신값으로 갱신
             f.write(f"BOOKSTACK_API_URL={bs_url}\n")
             f.write(f"BOOKSTACK_TOKEN_ID={bs_id}\n")
             f.write(f"BOOKSTACK_TOKEN_SECRET={bs_secret}\n")
-            f.write(f"USE_GWS_CLI={'true' if use_gws else 'false'}\n")
+            f.write(f"USE_GWS_CLI={use_gws_str}\n")
         console.print("┣ [green]글로벌 인증 저장 완료:[/green] ~/.arti-ops/credentials")
     except EOFError:
         console.print("┣ [yellow]설정이 취소되었습니다.[/yellow]")
     except KeyboardInterrupt:
         console.print("┣ [yellow]설정이 취소되었습니다.[/yellow]")
+
 
 @app.command
 def init():

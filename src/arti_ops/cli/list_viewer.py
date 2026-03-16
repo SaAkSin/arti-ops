@@ -16,6 +16,7 @@ from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 from arti_ops.agents.globalizer import get_globalizer_agent
+from arti_ops.core.policy_cache import PolicyCache
 try:
     from pygments.lexers.diff import DiffLexer as _DiffLexer
     _DIFF_LEXER = PygmentsLexer(_DiffLexer)
@@ -23,7 +24,7 @@ except Exception:
     _DIFF_LEXER = None  # pygments 없으면 DiffLexer 없이 동작
 
 
-async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None, upsert_style=None, project_id=None):
+async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None, upsert_style=None, project_id=None, policy_cache=None):
     """
     plan_lookup: { "rel_path": "Create" | "Update" | "Match" }
     base_dir: .agents 디렉토리 경로
@@ -106,6 +107,9 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     is_diff_view = False      # Diff 결과 표시 중인지 여부
     is_pipeline_view = False  # 파이프라인 재실행 결과 표시 중인지 여부
     original_content = ""     # L1 미리보기 / Diff / 파이프라인 Esc 복원용 원본 내용
+
+    # 외부에서 주입된 캐시 인스턴스를 사용, 없으면 신규 생성
+    _policy_cache = policy_cache if policy_cache is not None else PolicyCache.__new__(PolicyCache)
 
     # 처음에 포커스 가능한 아이템 찾기
     for i, (_, path) in enumerate(items):
@@ -247,6 +251,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     @kb.add("q", filter=Condition(lambda: not is_edit_mode))
     def _(event):
         try:
+            _policy_cache.clear()
+            _policy_cache.close()
             event.app.exit()
         except Exception:
             pass
@@ -279,6 +285,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         else:
             # 뷰어 종료
             try:
+                _policy_cache.clear()
+                _policy_cache.close()
                 event.app.exit()
             except Exception:
                 pass
@@ -524,6 +532,14 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             # 선택된 파일 경로를 타겟으로 명시한 지시문 구성 (단일 파일 스코프 제한)
             rel_path = os.path.relpath(active_file_path, os.path.dirname(base_dir))
             file_type = "rule" if "rules" in rel_path else "skill"
+
+            # 캐시에서 L1 정책 조회 → 있으면 프롬프트에 주입하여 불필요한 fetch 방지
+            cached_l1 = _policy_cache.get("global") or ""
+            l1_hint = (
+                f"\n\n[L1 글로벌 정책 (캐시 — 별도 fetch 불필요)]\n{cached_l1}"
+                if cached_l1 else ""
+            )
+
             prompt = (
                 f"[분석 스코프 제한 — 단일 파일 전용]\n"
                 f"이것은 l 뷰어에서 특정 {file_type}을 선택하여 실행한 개별 파일 분석 요청입니다.\n"
@@ -532,6 +548,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 f"[현재 파일 전체 내용]\n{original_content}\n\n"
                 f"위 단일 파일에 한정하여 BookStack에서 대응 위키 페이지(L1/L2)만 조회하고, "
                 f"개선 기획안과 검증 보고서를 작성하십시오."
+                f"{l1_hint}"
             )
             session_id = f"inline_{os.path.basename(active_file_path)}"
             verifier_report = ""
@@ -609,10 +626,16 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         try:
             # project_id: workspace scope일 때 필수. run_list_viewer에서 전달받음
             pid = project_id if scope == "workspace" else None
-            wiki_md = await bookstack.fetch_policies(
-                scope_tag=scope,
-                project_id=pid
-            )
+            cache_key = pid or ""
+
+            # 캐시 조회 → HIT 시 API 호출 생략
+            wiki_md = _policy_cache.get(scope, cache_key)
+            if wiki_md is None:
+                wiki_md = await bookstack.fetch_policies(
+                    scope_tag=scope,
+                    project_id=pid
+                )
+                _policy_cache.set(scope, wiki_md, cache_key)
             wiki_section = _extract_page_section(wiki_md, active_file_path)
             local_lines = original_content.splitlines(keepends=True)
             wiki_lines = wiki_section.splitlines(keepends=True)
