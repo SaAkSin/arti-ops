@@ -11,26 +11,27 @@ echo "================================================================="
 echo ""
 
 # 1. uv 설치 여부 확인 및 설치
-if ! command -v uv &> /dev/null; then
-    echo "➜ 파이썬 패키지 매니저 'uv'가 설치되어 있지 않습니다. 설치를 진행합니다..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    
-    # 임시로 현재 쉘 세션에 uv 및 로컬 패키지 경로 추가
-    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-    
     if ! command -v uv &> /dev/null; then
-        echo "✖ 'uv' 설치에 실패했거나 환경 변수(PATH)에 추가되지 않았습니다."
-        echo "다음 명령을 수동으로 실행하여 환경 변수를 적용한 뒤 다시 시도해주세요:"
-        echo "source \$HOME/.cargo/env"
-        exit 1
+        echo "➜ 파이썬 패키지 매니저 'uv'가 설치되어 있지 않습니다. 설치를 진행합니다..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        
+        # 공식 설치 스크립트로 설치 시 경로를 현 세션에 임시로 강제 반영
+        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+        
+        if ! command -v uv &> /dev/null; then
+            echo "✖ 'uv' 설치에 실패했거나 환경 변수(PATH)에 추가되지 않았습니다."
+            echo "다음 명령을 수동으로 실행하여 환경 변수를 적용한 뒤 다시 시도해주세요:"
+            echo "source \$HOME/.cargo/env"
+            exit 1
+        fi
+        echo "✔ 'uv' 패키지 매니저 설치 완료!"
+    else
+        echo "✔ 'uv' 패키지 매니저가 이미 설치되어 있습니다. ($(which uv))"
     fi
-    echo "✔ 'uv' 패키지 매니저 설치 완료!"
-else
-    echo "✔ 'uv' 패키지 매니저가 이미 설치되어 있습니다."
-fi
 
 # 2. arti-ops 전역 설치 (최신 main 브랜치 기준으로 설치 및 업데이트)
-export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+# 시스템(homebrew 등)에 사전 설치된 경우를 대비하여 PATH 덮어쓰기를 생략하거나 가장 뒤로 미룸.
+export PATH="$PATH:$HOME/.local/bin:$HOME/.cargo/bin"
 echo "➜ 'arti-ops' CLI 도구를 시스템 전역에 설치(또는 업데이트)합니다..."
 uv tool install --force "git+https://github.com/SaAkSin/arti-ops.git@main"
 
