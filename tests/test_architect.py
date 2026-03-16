@@ -15,5 +15,6 @@ def test_architect_agent_initialization():
     # 속성 검증
     assert agent.name == "skill_architect"
     assert "정책 병합관 'Architect'" in agent.instruction
-    assert "파이썬 스크립트 한 편" in agent.instruction
+    assert ".agents/rules/" in agent.instruction
+    assert ".agents/skills/" in agent.instruction
     assert agent.model == os.getenv("GEMINI_MODEL_PRO", "gemini-2.5-pro")

@@ -5,7 +5,8 @@
 
 ## [Unreleased]
 ### Added
-- `list_viewer.py` 모듈 신규 추가 및 `l` (list) 명령어 전면 고도화: 텍스트 출력을 넘어 좌우 분할(Split) 방식의 전체화면 대화형 TUI 뷰어를 구현, 방향키(`↑`/`↓`) 목록 탐색 및 스페이스바(`Space`) 파일 내용 미리보기 기능 지원 (터미널 호환성을 위해 기하학 ASCII 도형 사용)
+- `list_viewer.py` `l` 명령어 뷰어에 인라인 파일 편집 기능 추가: `e` 키로 EDIT 모드 진입(우측 패널 포커스 + 파일 열린 상태에 한정), `Ctrl+S`로 저장, `Esc`로 편집 취소 및 원본 복원. 저장 시 배지 자동 갱신(`Match` → `Update`, `Create`/`Update`는 유지). 타이틀·toolbar에 편집 모드 및 `[미저장 *]` 상태 동적 표시.
+- `tests/test_architect.py`, `tests/test_profiler.py` 낡은 instruction 문자열 검증을 현재 코드 기준으로 갱신
 - `u` (upsert) 명령어를 통한 로컬 에셋(규칙, 스킬)의 BookStack 대화형 동기화 기능 추가 (체크박스 다이얼로그 지원)
 - 대화형 TUI 환경(Native IME 기반) 도입 및 `rich`, `prompt_toolkit` 마이그레이션 적용
 - `r` (reset) 명령어를 통한 `sessions.db` 캐시 명시적 초기화 기능 추가
