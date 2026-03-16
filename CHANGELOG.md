@@ -3,6 +3,18 @@
 모든 변경 사항은 이 파일에 기록됩니다.
 이 프로젝트는 유의적 버전(Semantic Versioning)을 따릅니다.
 
+## [Unreleased]
+
+### Added
+
+- `list_viewer.py` `p` 키: 현재 선택된 rule/skill 파일을 대상으로 Profiler→Architect→Verifier 인라인 파이프라인 실행 후 Verifier 보고서를 우측 패널에 표시. `Esc`로 원본 복원. Toolbar 스피너 애니메이션 표시.
+- `pipeline.py` `run(inline=True)` 파라미터 추가: Verifier 결과를 HITL 없이 즉시 반환하고 Executor를 건너뜀 (l 뷰어 미리보기 모드 지원)
+
+### Changed
+
+- `agents/profiler.py` 지시문 개선: 로컬 환경 스캔·글로벌 정책 수집·충돌 탐지(Conflict Detection) 3단계 구조로 재정의, 출력 포맷 명세 추가
+- `agents/architect.py` 지시문 개선: 로컬 우선 원칙(Override) 및 Context-Aware Adaptation 중심으로 정책 융합 전략 전환, Soft-Merge 방식 명세
+
 ## [0.5.2] - 2026-03-16
 
 ### Added

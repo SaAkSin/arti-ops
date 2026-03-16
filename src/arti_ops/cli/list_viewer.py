@@ -104,7 +104,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     active_file_path = None   # 현재 우측 패널에 열린 파일 경로
     is_l1_preview = False     # L1 변환 미리보기 표시 중인지 여부
     is_diff_view = False      # Diff 결과 표시 중인지 여부
-    original_content = ""     # L1 미리보기 / Diff Esc 복원용 원본 내용
+    is_pipeline_view = False  # 파이프라인 재실행 결과 표시 중인지 여부
+    original_content = ""     # L1 미리보기 / Diff / 파이프라인 Esc 복원용 원본 내용
 
     # 처음에 포커스 가능한 아이템 찾기
     for i, (_, path) in enumerate(items):
@@ -176,6 +177,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         is_agents = active_file_path and ".agents" in active_file_path
         g_hint = " | g: L1 변환" if is_agents else ""
         d_hint = " | d: Diff비교" if bookstack else ""
+        p_hint = " | p: 파이프라인" if is_agents else ""
         if is_edit_mode:
             toolbar_text_control.text = (
                 " [Ctrl+S: 저장 | Esc: 편집 취소 | 내용 자유 수정 가능]"
@@ -188,13 +190,17 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             toolbar_text_control.text = (
                 " [Diff 뷰 중 | Ctrl+C: 복사 | Esc: 원본 복원]"
             )
+        elif is_pipeline_view:
+            toolbar_text_control.text = (
+                " [파이프라인 결과 중 | Ctrl+C: 복사 | Esc: 원본 복원]"
+            )
         elif current_focus == "right":
             toolbar_text_control.text = (
-                f" [e: 편집{g_hint}{d_hint} | Ctrl+C: 복사 | ↑/↓: 스크롤 | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
+                f" [e: 편집{g_hint}{d_hint}{p_hint} | Ctrl+C: 복사 | ↑/↓: 스크롤 | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
             )
         else:
             toolbar_text_control.text = (
-                f" [↑/↓: 이동+미리보기 | Enter: 편집{g_hint}{d_hint} | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
+                f" [↑/↓: 이동+미리보기 | Enter: 편집{g_hint}{d_hint}{p_hint} | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
             )
 
     def get_right_panel_title():
@@ -245,16 +251,17 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         except Exception:
             pass
 
-    # ─── Esc: L1 미리보기 복원 → EDIT 취소 → 뷰어 종료 순으로 처리 ───
+    # ─── Esc: L1 미리보기 복원 → 파이프라인 뷰 복원 → EDIT 취소 → 뷰어 종료 순으로 처리 ───
     @kb.add("escape")
     def _(event):
-        nonlocal is_edit_mode, is_dirty, is_l1_preview, is_diff_view
-        if is_l1_preview or is_diff_view:
-            # L1 미리보기 / Diff 뷰 중: 원본 복원
+        nonlocal is_edit_mode, is_dirty, is_l1_preview, is_diff_view, is_pipeline_view
+        if is_l1_preview or is_diff_view or is_pipeline_view:
+            # L1 미리보기 / Diff / 파이프라인 뷰 중: 원본 복원
             right_text_area.text = original_content
             is_l1_preview = False
             is_diff_view = False
-            diff_text_area.text = ""   # Diff 영역 졸울
+            is_pipeline_view = False
+            diff_text_area.text = ""   # Diff 영역 초기화
             update_toolbar()
             try:
                 get_app().layout.focus(right_text_area)
@@ -468,6 +475,84 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             spinner_running = False
             spinner_task.cancel()
         update_toolbar()
+
+    # ─── p: 파이프라인 재실행 (.agents 파일에 한정, PRD/SSD 제외) ───
+    @kb.add("p", filter=Condition(
+        lambda: not is_edit_mode
+            and active_file_path is not None
+            and ".agents" in (active_file_path or "")
+    ))
+    def trigger_pipeline(event):
+        """p 키: 현재 파일을 대상으로 Profiler→Architect→Verifier 파이프라인을 실행한다."""
+        asyncio.ensure_future(_do_pipeline())
+
+    async def _do_pipeline():
+        """ArtiOpsPipeline(inline=True)으로 파이프라인을 실행하고 Verifier 보고서를 우측 패널에 표시한다."""
+        nonlocal is_pipeline_view, original_content
+
+        original_content = right_text_area.text
+        is_pipeline_view = True
+        update_toolbar()
+
+        # ── toolbar 스피너 ──
+        frames = ["|", "/", "-", "\\"]
+        spinner_running = True
+
+        async def _spinner():
+            i = 0
+            while spinner_running:
+                toolbar_text_control.text = (
+                    f" [파이프라인 실행 중 {frames[i % 4]}  |  Esc: 취소]"
+                )
+                i += 1
+                try:
+                    get_app().invalidate()   # 화면 강제 갱신
+                except Exception:
+                    pass
+                await asyncio.sleep(0.12)
+
+        spinner_task = asyncio.ensure_future(_spinner())
+
+        try:
+            from arti_ops.core.pipeline import ArtiOpsPipeline
+            from arti_ops.config import Configurator
+
+            # project_id 결정
+            pid = project_id or Configurator.get_instance().project_id or "workspace"
+            pipe = ArtiOpsPipeline(target_project_id=pid)
+
+            # 선택된 파일 경로를 타겟으로 명시한 지시문 구성
+            rel_path = os.path.relpath(active_file_path, os.path.dirname(base_dir))
+            prompt = (
+                f"아래 로컬 파일을 분석하여 개선 기획안과 검증 보고서를 작성하십시오.\n"
+                f"타겟 파일: `{rel_path}`\n\n"
+                f"[현재 파일 내용]\n{original_content}"
+            )
+            session_id = f"inline_{os.path.basename(active_file_path)}"
+            verifier_report = ""
+
+            async for event in pipe.run(command_prompt=prompt, session_id=session_id, inline=True):
+                if isinstance(event, dict):
+                    if event.get("status") == "pending_final_approval":
+                        verifier_report = event.get("report", "")
+                        # HITL 없이 즉시 resume → Executor 건너뜀
+                        await pipe.resume(session_id, {"approved": False, "feedback": "__inline_preview__"})
+                        break
+
+            right_text_area.text = verifier_report or "[파이프라인 결과 없음]"
+
+        except Exception as e:
+            right_text_area.text = f"[파이프라인 실패: {e}]\n\n{original_content}"
+            is_pipeline_view = False
+        finally:
+            spinner_running = False
+            spinner_task.cancel()
+
+        update_toolbar()
+        try:
+            get_app().layout.focus(right_text_area)
+        except Exception:
+            pass
 
     # ─── d: L2(Workspace) Diff / D: L1(Global) Diff (.agents 파일 전용) ───
     _diff_filter = Condition(

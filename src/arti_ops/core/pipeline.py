@@ -58,7 +58,7 @@ class ArtiOpsPipeline:
             auto_create_session=True
         )
 
-    async def run(self, command_prompt: str, session_id: str = None) -> AsyncGenerator[any, None]:
+    async def run(self, command_prompt: str, session_id: str = None, inline: bool = False) -> AsyncGenerator[any, None]:
         session_id = session_id or f"sess_{self.target_project_id}"
         current_input = command_prompt
         
@@ -156,6 +156,13 @@ class ArtiOpsPipeline:
                 is_rejected = True
                 
             if is_rejected:
+                # inline 모드: 반려 시에도 Verifier 보고서를 즉시 반환하고 종료
+                if inline:
+                    yield {"type": "phase_end", "agent": "critical_verifier", "status": "success"}
+                    self._pause_event.clear()
+                    yield {"status": "pending_final_approval", "report": ver_text}
+                    await self._pause_event.wait()
+                    return
                 retry_count += 1
                 current_input = f"[Verifier 반려 사유]\n{ver_text}\n\n위 반려 사유를 바탕으로 산출물을 수정하여 재기획하세요."
                 yield {"type": "phase_end", "agent": "critical_verifier", "status": "failed"}
@@ -169,6 +176,10 @@ class ArtiOpsPipeline:
                 }
                 
                 await self._pause_event.wait()
+                
+                # inline 모드: HITL 없이 즉시 종료 (Executor 건너뜀)
+                if inline:
+                    return
                 
                 if not self._is_approved:
                     verifier_passed = False
