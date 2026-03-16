@@ -235,7 +235,8 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     plan_lookup, base_dir,
                     full_plan=plan,
                     bookstack=bookstack,
-                    upsert_style=pt_style
+                    upsert_style=pt_style,
+                    project_id=workspace
                 )
                 
                 console.print("\n[bold cyan]✔ 로컬 현황 조회를 완료했습니다.[/bold cyan]")

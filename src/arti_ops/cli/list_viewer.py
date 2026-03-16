@@ -8,7 +8,7 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import Condition, to_filter
-from prompt_toolkit.shortcuts import checkboxlist_dialog, radiolist_dialog
+from prompt_toolkit.shortcuts import checkboxlist_dialog
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
 from google.adk import Runner
@@ -17,7 +17,7 @@ from google.genai.types import Content, Part
 from arti_ops.agents.globalizer import get_globalizer_agent
 
 
-async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None, upsert_style=None):
+async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None, upsert_style=None, project_id=None):
     """
     plan_lookup: { "rel_path": "Create" | "Update" | "Match" }
     base_dir: .agents 디렉토리 경로
@@ -446,15 +446,28 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             spinner_task.cancel()
         update_toolbar()
 
-    # ─── d: Diff 비교 (BookStack L1 or L2 vs 로컬) ───
-    @kb.add("d", filter=Condition(
+    # ─── d: L2(Workspace) Diff / D: L1(Global) Diff (.agents 파일 전용) ───
+    _diff_filter = Condition(
         lambda: not is_edit_mode
             and active_file_path is not None
             and bookstack is not None
-    ))
-    def trigger_diff(event):
-        """d 키: 현재 파일을 BookStack 정책과 비교하여 우측 패널에 diff 표시."""
-        asyncio.ensure_future(_do_diff())
+    )
+    _diff_l1_filter = Condition(
+        lambda: not is_edit_mode
+            and active_file_path is not None
+            and bookstack is not None
+            and ".agents" in (active_file_path or "")
+    )
+
+    @kb.add("d", filter=_diff_filter)
+    def trigger_diff_l2(event):
+        """d 키: L2(Workspace) vs 로컬 diff."""
+        asyncio.ensure_future(_do_diff("workspace"))
+
+    @kb.add("D", filter=_diff_l1_filter)
+    def trigger_diff_l1(event):
+        """D 키: L1(Global) vs 로컬 diff (.agents 파일 전용)."""
+        asyncio.ensure_future(_do_diff("global"))
 
     def _extract_page_section(wiki_md: str, file_path: str) -> str:
         """wiki_md(fetch_policies 결과)에서 현재 파일에 대응하는 섹션을 추출한다."""
@@ -470,35 +483,22 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         m = re.search(pattern, wiki_md, re.DOTALL)
         return m.group(1).strip() if m else f"(BookStack에서 '{page_name}' 페이지를 찾을 수 없음)"
 
-    async def _do_diff():
+    async def _do_diff(scope: str):
         """BookStack 정책과 로컬 파일을 difflib으로 비교해 우측 패널에 표시."""
         nonlocal is_diff_view, original_content
 
-        # PRD/SSD는 L2 고정, .agents 파일은 L1/L2 선택 다이얼로그
-        is_agents = active_file_path and ".agents" in active_file_path
-        if is_agents:
-            scope = await radiolist_dialog(
-                title="Diff 대상 선택",
-                text="비교할 BookStack 정책 레벨을 선택하세요:",
-                values=[
-                    ("global",    "L1  (Global 전역 정책)"),
-                    ("workspace", "L2  (Workspace 정책)"),
-                ]
-            ).run_async()
-            if not scope:
-                return
-        else:
-            scope = "workspace"  # PRD/SSD는 L2만 존재
-
         original_content = right_text_area.text
         is_diff_view = True
-        right_text_area.text = f"BookStack({scope}) 와 비교 중..."
+        scope_label = "L1 Global" if scope == "global" else "L2 Workspace"
+        right_text_area.text = f"BookStack({scope_label}) 와 비교 중..."
         update_toolbar()
 
         try:
+            # project_id: workspace scope일 때 필수. run_list_viewer에서 전달받음
+            pid = project_id if scope == "workspace" else None
             wiki_md = await bookstack.fetch_policies(
                 scope_tag=scope,
-                project_id=getattr(bookstack, "workspace_id", "")
+                project_id=pid
             )
             wiki_section = _extract_page_section(wiki_md, active_file_path)
             local_lines = original_content.splitlines(keepends=True)
@@ -506,7 +506,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             diff_lines = list(difflib.unified_diff(
                 wiki_lines,
                 local_lines,
-                fromfile=f"BookStack ({scope})",
+                fromfile=f"BookStack ({scope_label})",
                 tofile="로컬 파일",
                 lineterm=""
             ))
