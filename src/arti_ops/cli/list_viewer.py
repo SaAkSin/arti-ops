@@ -358,6 +358,9 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
 
             choices = []
             for item in full_plan:
+                # Match(위키와 동일) 항목은 배포 대상이 아니므로 제외
+                if item.get("action") == "Match":
+                    continue
                 display_text = f"[{get_symbol(item['action'])}] {item['rel_path']}"
                 if item.get("type") == "skills":
                     skill_dir = os.path.join(os.getcwd(), os.path.dirname(item["rel_path"]))

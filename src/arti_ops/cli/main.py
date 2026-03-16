@@ -174,6 +174,9 @@ async def run_interactive_loop(workspace: str, target_agent: str):
 
                 choices = []
                 for item in plan:
+                    # Match(위키와 동일) 항목은 배포 대상이 아니므로 제외
+                    if item.get("action") == "Match":
+                        continue
                     display_text = f"[{get_symbol(item['action'])}] {item['rel_path']}"
                     
                     if item.get("type") == "skills":
