@@ -6,11 +6,12 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import Condition, to_filter
+from prompt_toolkit.shortcuts import checkboxlist_dialog
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
 
 
-async def run_list_viewer(plan_lookup, base_dir):
+async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None, upsert_style=None):
     """
     plan_lookup: { "rel_path": "Create" | "Update" | "Match" }
     base_dir: .agents 디렉토리 경로
@@ -135,17 +136,18 @@ async def run_list_viewer(plan_lookup, base_dir):
 
     def update_toolbar():
         """현재 모드/포커스에 맞는 toolbar 힌트를 갱신한다."""
+        upsert_hint = " | u: 위키 배포" if (full_plan and bookstack) else ""
         if is_edit_mode:
             toolbar_text_control.text = (
                 " [Ctrl+S: 저장 | Esc: 편집 취소 | 내용 자유 수정 가능]"
             )
         elif current_focus == "right":
             toolbar_text_control.text = (
-                " [e: 편집 모드 | ↑/↓: 텍스트 스크롤 | Tab: 뷰 전환 | q / Esc / Enter: 닫기]"
+                f" [e: 편집 모드 | ↑/↓: 텍스트 스크롤 | Tab: 뷰 전환{upsert_hint} | q/Esc/Enter: 닫기]"
             )
         else:
             toolbar_text_control.text = (
-                " [↑/↓: 이동 | Space: 미리보기 | Tab: 뷰 전환 | q / Esc / Enter: 닫기]"
+                f" [↑/↓: 이동 | Space: 미리보기 | Tab: 뷰 전환{upsert_hint} | q/Esc/Enter: 닫기]"
             )
 
     def get_right_panel_title():
@@ -261,6 +263,62 @@ async def run_list_viewer(plan_lookup, base_dir):
     def _(event):
         if current_focus == "right":
             right_text_area.buffer.cursor_down(count=15)
+
+    # ─── 좌/우 키: EDIT 모드가 아닐 때는 TextArea 기본 커서 이동을 차단 ───
+    # TextArea는 항상 실제 포커스를 가지므로, 명시적으로 소비하지 않으면
+    # current_focus == "left" 상태에서도 커서가 우측 패널에서 움직인다.
+    @kb.add("left", filter=Condition(lambda: not is_edit_mode))
+    @kb.add("right", filter=Condition(lambda: not is_edit_mode))
+    def _(event):
+        pass  # no-op으로 소비
+
+    # ─── u: Upsert (full_plan과 bookstack이 있을 때만 활성화) ───
+    @kb.add("u", filter=Condition(
+        lambda: full_plan is not None and bookstack is not None and not is_edit_mode
+    ))
+    def trigger_upsert(event):
+        """l 뷰어 내부에서 u 키로 BookStack Upsert를 실행한다."""
+        async def _do_upsert():
+            def get_symbol(action):
+                return {"Create": "!", "Update": "*", "Match": " "}.get(action, " ")
+
+            choices = []
+            for item in full_plan:
+                display_text = f"[{get_symbol(item['action'])}] {item['rel_path']}"
+                # skills 부속 파일 안내 추가
+                if item.get("type") == "skills":
+                    skill_dir = os.path.join(os.getcwd(), os.path.dirname(item["rel_path"]))
+                    if os.path.exists(skill_dir):
+                        for root, _, files in os.walk(skill_dir):
+                            for file in sorted(files):
+                                if file == "SKILL.md" or file.startswith(".") or file.endswith(".pyc"):
+                                    continue
+                                sub_path = os.path.join(root, file)
+                                rel_sub = os.path.relpath(sub_path, skill_dir)
+                                display_text += f"\n      ↳ {rel_sub}"
+                choices.append((item, display_text))
+
+            selected = await asyncio.to_thread(
+                checkboxlist_dialog(
+                    title="위키 연동 (BookStack Upsert)",
+                    text=(
+                        "방향키(↑/↓)와 스페이스바(Space)로 배포할 항목을 선택하세요.\n"
+                        "[ ! : 신규 추가 | * : 위키와 로컈 내용 다름 (업데이트 대상) | 공백 : 컨텐츠 완전 동일 (수정 불필요) ]"
+                    ),
+                    values=choices,
+                    style=upsert_style
+                ).run
+            )
+
+            if selected:
+                await bookstack.execute_upsert(selected)
+                # 배포된 항목 배지 갱신: 위키에 업로드되었으므로 Match로 표시
+                for item in selected:
+                    plan_lookup[item["rel_path"]] = "Match"
+                rebuild_items_badges()
+                update_left_pane()
+
+        asyncio.ensure_future(_do_upsert())
 
     # ─── Space: 파일 미리보기 로드 ───
     @kb.add("space", filter=Condition(lambda: not is_edit_mode))

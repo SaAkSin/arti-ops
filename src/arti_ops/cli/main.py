@@ -228,8 +228,13 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                 # 룩업 딕셔너리 생성 (rel_path: action)
                 plan_lookup = {item["rel_path"]: item["action"] for item in plan}
                 
-                # 대화형 List Viewer 실행
-                await run_list_viewer(plan_lookup, base_dir)
+                # 대화형 List Viewer 실행 (full_plan·bookstack·pt_style 전달로 u 기능 통합)
+                await run_list_viewer(
+                    plan_lookup, base_dir,
+                    full_plan=plan,
+                    bookstack=bookstack,
+                    upsert_style=pt_style
+                )
                 
                 console.print("\n[bold cyan]✔ 로컬 현황 조회를 완료했습니다.[/bold cyan]")
                 continue

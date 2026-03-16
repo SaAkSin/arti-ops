@@ -4,14 +4,19 @@
 이 프로젝트는 유의적 버전(Semantic Versioning)을 따릅니다.
 
 ## [Unreleased]
+
 ### Added
-- `list_viewer.py` `l` 명령어 뷰어에 인라인 파일 편집 기능 추가: `e` 키로 EDIT 모드 진입(우측 패널 포커스 + 파일 열린 상태에 한정), `Ctrl+S`로 저장, `Esc`로 편집 취소 및 원본 복원. 저장 시 배지 자동 갱신(`Match` → `Update`, `Create`/`Update`는 유지). 타이틀·toolbar에 편집 모드 및 `[미저장 *]` 상태 동적 표시.
+
+- `list_viewer.py` `l` 뷰어에 `u` 키로 BookStack Upsert 기능 직접 통합: `checkboxlist_dialog`로 항목 선택 후 배포. 배포 완료 항목 배지 즉시 `Match`로 갱신. toolbar에 `u: 위키 배포` 힌트 자동 표시.
+- `list_viewer.py` 함수 시그니처에 `full_plan`, `bookstack`, `upsert_style` 추가, `main.py` 호출부에 `pt_style` 전달하여 `u`/`l` 다이얼로그 색상 일치.
+
 - `tests/test_architect.py`, `tests/test_profiler.py` 낡은 instruction 문자열 검증을 현재 코드 기준으로 갱신
 - `u` (upsert) 명령어를 통한 로컬 에셋(규칙, 스킬)의 BookStack 대화형 동기화 기능 추가 (체크박스 다이얼로그 지원)
 - 대화형 TUI 환경(Native IME 기반) 도입 및 `rich`, `prompt_toolkit` 마이그레이션 적용
 - `r` (reset) 명령어를 통한 `sessions.db` 캐시 명시적 초기화 기능 추가
 
 ### Changed
+
 - 위키 연동 현황 표기를 단순 파일 유무 방식(`N`, `U`)에서 실제 마크다운 내용 1:1 병렬 대조(Match) 방식으로 고도화하고, 직관적인 신규 심볼(`!` 신규, `*` 변경됨, ` ` 완벽 일치/수정불필요) 도입
 - `u` (upsert) 명령어 체크박스 다이얼로그의 색상을 터미널 기본 다크 테마와 이질감 없게 조화로운 배색으로 스타일링 통합
 - CLI 콘솔 내 호환성 및 출력 깨짐 문제를 해결하기 위해 시스템 안내 메시지 및 트리의 모든 이모지 기호를 모던 기하학 ASCII 도형(▶, ■, ◎, √ 등)으로 전면 교체
@@ -20,6 +25,7 @@
 - `.agents/rules/`의 경우 `[Name].md`, `.agents/skills/`의 경우 `[Name]/SKILL.md` 디렉토리 구조 생성으로 매핑 로직 분리
 
 ### Fixed
+
 - `gws_chat.py` `send_summary()` 내 미존재 속성 `self.gws_space_id` 참조를 올바른 `self.check_room_id`로 수정 (런타임 `AttributeError` 방지)
 - `pipeline.py` `resume()` 메서드 중복 정의(L61) 제거, 인자명 `action_response`로 통일
 - `agents/verifier.py`, `agents/executor.py` 중복 `import get_config` 라인 제거
