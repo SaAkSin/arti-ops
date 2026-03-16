@@ -14,6 +14,6 @@ def test_verifier_agent_initialization():
     
     # 속성 검증
     assert agent.name == "critical_verifier"
-    assert "깐깐한 감사관 'Verifier' (Red-Team)" in agent.instruction
-    assert "L1 Global Rule을 조금이라도 위반하는 내용이 있는지 심사" in agent.instruction
+    assert "아키텍트가 작성한 기획안" in agent.instruction
+    assert ".agents/rules/" in agent.instruction
     assert agent.model == os.getenv("GEMINI_MODEL_PRO", "gemini-2.5-pro")

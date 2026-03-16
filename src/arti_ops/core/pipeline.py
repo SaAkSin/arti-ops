@@ -58,11 +58,6 @@ class ArtiOpsPipeline:
             auto_create_session=True
         )
 
-    async def resume(self, session_id: str, action: dict):
-        self._is_approved = action.get("approved", False)
-        self._human_feedback = action.get("feedback", "")
-        self._pause_event.set()
-
     async def run(self, command_prompt: str, session_id: str = None) -> AsyncGenerator[any, None]:
         session_id = session_id or f"sess_{self.target_project_id}"
         current_input = command_prompt

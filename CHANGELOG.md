@@ -19,6 +19,10 @@
 - `.agents/rules/`의 경우 `[Name].md`, `.agents/skills/`의 경우 `[Name]/SKILL.md` 디렉토리 구조 생성으로 매핑 로직 분리
 
 ### Fixed
-- `u` 명령어 배포 이후에도 `l` 명령어 조회 시 계속해서 전체 내용이 신규 `(N)`로 표기되던 동기화 뱃지 식별 오류 수정 (BookStack API의 중첩 Pages 배열 한계로 인해 각 개별 챕터(`/api/chapters`)를 직접 참조하도록 로직 변경)
-- 사용자가 `y`를 입력해 최종 반영을 지시했음에도 `Deployment Executor`로 넘어가지 못하고 영구 대기(Hang)하던 동시성 Lock 해제 버그(`_pause_event.clear()`) 수정
-- PlantUML 렌더링 시 외부 환경에서 혼합 다이어그램 호환성을 보장하기 위한 allowmixing 지시어 결함 패치 적용 문서화
+- `gws_chat.py` `send_summary()` 내 미존재 속성 `self.gws_space_id` 참조를 올바른 `self.check_room_id`로 수정 (런타임 `AttributeError` 방지)
+- `pipeline.py` `resume()` 메서드 중복 정의(L61) 제거, 인자명 `action_response`로 통일
+- `agents/verifier.py`, `agents/executor.py` 중복 `import get_config` 라인 제거
+- `tools/bookstack.py` 미정의 `console` 객체 사용 2곳 → `logger.error()` / `logger.warning()`으로 대체 (NameError 방지)
+- `tests/test_pipeline.py` 삭제된 `pipeline.sandbox_tool` assertion 제거
+- `tests/test_gws_chat.py` 존재하지 않는 `request_approval()`, `run()` 메서드 호출을 실제 `send_summary()` 기반으로 재작성
+- `tests/test_verifier.py`, `tests/test_executor.py` 낡은 instruction 문자열 검증 구문을 현재 코드 기준으로 갱신

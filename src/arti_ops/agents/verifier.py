@@ -1,7 +1,6 @@
 import os
 from google.adk.agents import Agent
 from arti_ops.config import get_config
-from arti_ops.config import get_config
 
 def get_verifier_agent(tools: list = None) -> Agent:
     instructions = """

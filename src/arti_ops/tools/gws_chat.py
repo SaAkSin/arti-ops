@@ -29,13 +29,13 @@ class GwsChatTool:
         try:
             env = os.environ.copy()
             process = await asyncio.create_subprocess_exec(
-                "gws", "chat", "+send", "--space", self.gws_space_id, "--text", message_body,
+                "gws", "chat", "+send", "--space", self.check_room_id, "--text", message_body,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=env
             )
             stdout, stderr = await process.communicate()
             
             if process.returncode == 0:
-                return f"Summary sent successfully to GWS space: {self.gws_space_id}"
+                return f"Summary sent successfully to GWS space: {self.check_room_id}"
             else:
                 return f"Failed to send summary: {stderr.decode('utf-8')}"
         except Exception as e:

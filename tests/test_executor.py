@@ -14,7 +14,7 @@ def test_executor_agent_initialization():
     
     # 속성 검증
     assert agent.name == "deployment_executor"
-    assert "최종 배포 집행관 'Executor'" in agent.instruction
-    assert "SandboxTool 의 가상 환경(Container)에서 Dry-Run 구동" in agent.instruction
-    assert "BookStackToolset의 `publish_sync_report` 툴을 호출" in agent.instruction
+    assert "배포 집행관 'Executor'" in agent.instruction
+    assert "write_file" in agent.instruction
+    assert "send_summary" in agent.instruction
     assert agent.model == os.getenv("GEMINI_MODEL_FLASH", "gemini-2.5-flash")
