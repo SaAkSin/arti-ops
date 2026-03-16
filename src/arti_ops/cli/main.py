@@ -511,6 +511,18 @@ def main_cli(workspace: Optional[str] = None, agent: str = "antigravity"):
     """
     현재 경로와 BookStack 정책을 참조하여 에이전트 환경을 대화형으로 생성합니다.
     """
+    # 글로벌 인증 정보 존재 여부 사전 검증 (Guard)
+    cred_file = Path.home() / ".arti-ops" / "credentials"
+    if not cred_file.exists():
+        console.print(Panel(
+            "[bold red]글로벌 인증 정보가 설정되지 않았습니다.[/bold red]\n\n"
+            "arti-ops 를 사용하려면 먼저 글로벌 인증(Gemini API Key, BookStack 등)을 등록해야 합니다.\n"
+            "아래 명령어를 실행하여 초기 설정을 완료하세요:\n\n"
+            "  [bold cyan]$ arti-ops setup[/bold cyan]",
+            title="⚠ 설정 필요", border_style="red"
+        ))
+        return
+
     config = Configurator.get_instance()
     
     if not workspace:
