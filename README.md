@@ -36,7 +36,8 @@
 ```bash
 curl -fsSL http://arti-ops.artgrammer.co.kr | bash
 ```
-> 설치가 끝나면 터미널에서 `arti-ops init`을 실행하여 워크스페이스를 초기화하세요. 상세한 커스텀 배포 및 수동 설치 방법은 [배포 가이드(docs/deploy_guide.md)](docs/deploy_guide.md)를 참조하세요.
+
+> 설치가 끝나면 터미널에서 `arti-ops setup`을 먼저 실행하여 글로벌 인증 정보를 설정하고, 로컬 디렉토리에서 `arti-ops init`을 실행하여 워크스페이스를 초기화하세요. 상세한 커스텀 배포 및 수동 설치 방법은 [배포 가이드(docs/deploy_guide.md)](docs/deploy_guide.md)를 참조하세요.
 
 ### 테스트용 실행 (소스 코드 클론 시)
 

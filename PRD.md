@@ -1,4 +1,4 @@
-# 📄 [PRD] arti-ops v0.5.0 제품 요구사항 명세서 (전면 개정판)
+# 📄 [PRD] arti-ops v0.5.1 제품 요구사항 명세서 (전면 개정판)
 
 ## 1. 제품 개요 (Product Overview)
 * **제품명:** arti-ops (로컬 컨텍스트 기반 AgentOps TUI 플랫폼)

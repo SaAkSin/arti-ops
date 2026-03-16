@@ -82,7 +82,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
         f"[bold green]▶ Target Workspace: '{workspace}' / Agent: '{target_agent}'[/bold green]\n"
         "[dim]명령어가 실행된 현재 디렉토리와 BookStack 정책을 분석하여 AI 스킬/룰을 자동 생성합니다.\n"
         "종료하려면 프롬프트에서 'q'를 입력하거나 Ctrl+C를 누르세요.[/dim]",
-        title="arti-ops v0.5.0", border_style="blue"
+        title="arti-ops v0.5.1", border_style="blue"
     ))
 
     def get_bottom_toolbar():
@@ -440,6 +440,43 @@ async def run_interactive_loop(workspace: str, target_agent: str):
 
 
 @app.command
+def setup():
+    """
+    arti-ops 를 전역적으로 사용하기 위한 글로벌 인증 정보를 설정하거나 재설정합니다.
+    """
+    console.print(Panel("[bold cyan]arti-ops 글로벌 인증 설정[/bold cyan]"))
+    
+    home_dir = Path.home() / ".arti-ops"
+    home_dir.mkdir(parents=True, exist_ok=True)
+    
+    cred_file = home_dir / "credentials"
+    if cred_file.exists():
+        console.print("┣ [yellow]기존 인증 정보가 존재합니다. 새로 입력하여 덮어씁니다.[/yellow]")
+        
+    try:
+        from prompt_toolkit import prompt
+        gemini_key = prompt("┃ ❯ Gemini API KeY: ", is_password=True).strip()
+        bs_url = prompt("┃ ❯ BookStack API URL (ex: https://wiki.ok.com/api): ").strip()
+        bs_id = prompt("┃ ❯ BookStack Token ID: ").strip()
+        bs_secret = prompt("┃ ❯ BookStack Token Secret (pwd): ", is_password=True).strip()
+        use_gws = prompt("┃ ❯ USE GWS CLI(y/n)? [n]: ").strip().lower() == 'y'
+        
+        with open(cred_file, "w") as f:
+            f.write("[default]\n")
+            f.write(f"GEMINI_API_KEY={gemini_key}\n")
+            f.write("GEMINI_MODEL_PRO=gemini-2.5-pro\n")
+            f.write("GEMINI_MODEL_FLASH=gemini-2.5-flash\n")
+            f.write(f"BOOKSTACK_API_URL={bs_url}\n")
+            f.write(f"BOOKSTACK_TOKEN_ID={bs_id}\n")
+            f.write(f"BOOKSTACK_TOKEN_SECRET={bs_secret}\n")
+            f.write(f"USE_GWS_CLI={'true' if use_gws else 'false'}\n")
+        console.print("┣ [green]글로벌 인증 저장 완료:[/green] ~/.arti-ops/credentials")
+    except EOFError:
+        console.print("┣ [yellow]설정이 취소되었습니다.[/yellow]")
+    except KeyboardInterrupt:
+        console.print("┣ [yellow]설정이 취소되었습니다.[/yellow]")
+
+@app.command
 def init():
     """
     arti-ops 를 전역적으로 사용하기 위한 글로벌(+로컬) 환경을 스캐폴딩(초기화)합니다.
@@ -461,33 +498,10 @@ def init():
     
     # 3. 글로벌 설정 프롬프트
     home_dir = Path.home() / ".arti-ops"
-    home_dir.mkdir(parents=True, exist_ok=True)
-    
     cred_file = home_dir / "credentials"
     if not cred_file.exists():
         console.print("┣ [dim]글로벌 인증 정보가 없습니다 (처음 1회만 입력).[/dim]")
-        try:
-            from prompt_toolkit import prompt
-            gemini_key = prompt("┃ ❯ Gemini API KeY: ", is_password=True).strip()
-            bs_url = prompt("┃ ❯ BookStack API URL (ex: https://wiki.ok.com/api): ").strip()
-            bs_id = prompt("┃ ❯ BookStack Token ID: ").strip()
-            bs_secret = prompt("┃ ❯ BookStack Token Secret (pwd): ", is_password=True).strip()
-            use_gws = prompt("┃ ❯ USE GWS CLI(y/n)? [n]: ").strip().lower() == 'y'
-            
-            with open(cred_file, "w") as f:
-                f.write("[default]\n")
-                f.write(f"GEMINI_API_KEY={gemini_key}\n")
-                f.write("GEMINI_MODEL_PRO=gemini-2.5-pro\n")
-                f.write("GEMINI_MODEL_FLASH=gemini-2.5-flash\n")
-                f.write(f"BOOKSTACK_API_URL={bs_url}\n")
-                f.write(f"BOOKSTACK_TOKEN_ID={bs_id}\n")
-                f.write(f"BOOKSTACK_TOKEN_SECRET={bs_secret}\n")
-                f.write(f"USE_GWS_CLI={'true' if use_gws else 'false'}\n")
-            console.print("┣ [green]글로벌 인증 저장 완료:[/green] ~/.arti-ops/credentials")
-        except EOFError:
-            pass
-        except KeyboardInterrupt:
-            pass
+        setup()
             
     console.print("┗ [bold green]모든 준비가 완료되었습니다! 이제 `arti-ops` 명령어를 사용하세요.[/bold green]")
 
