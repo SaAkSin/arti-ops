@@ -1,13 +1,14 @@
 import os
+import difflib
 import asyncio
 import subprocess
-from prompt_toolkit.application import Application
+from prompt_toolkit.application import Application, get_app
 from prompt_toolkit.layout.containers import HSplit, VSplit, Window
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import Condition, to_filter
-from prompt_toolkit.shortcuts import checkboxlist_dialog
+from prompt_toolkit.shortcuts import checkboxlist_dialog, radiolist_dialog
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
 from google.adk import Runner
@@ -72,6 +73,19 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 else:
                     items.append((f"  {dirname} (SKILL.md 누락)", None))
 
+    # ─── Docs 섹션: PRD.md / SSD.md (L2/L3만 존재, L1 없음) ───
+    project_root = os.path.dirname(base_dir)  # base_dir = .agents/ 의 부모
+    docs_targets = ["PRD.md", "SSD.md"]
+    docs_items = [(fname, os.path.join(project_root, fname))
+                  for fname in docs_targets
+                  if os.path.exists(os.path.join(project_root, fname))]
+    if docs_items:
+        if items:
+            items.append(("", None))
+        items.append(("■ Docs:", None))
+        for fname, fpath in docs_items:
+            items.append((f"  {fname}", fpath))
+
     if not items:
         # 비어있으면 그냥 종료
         return
@@ -83,7 +97,8 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     is_dirty = False          # 미저장 변경 여부
     active_file_path = None   # 현재 우측 패널에 열린 파일 경로
     is_l1_preview = False     # L1 변환 미리보기 표시 중인지 여부
-    original_content = ""     # L1 미리보기 Esc 복원용 원본 내용
+    is_diff_view = False      # Diff 결과 표시 중인지 여부
+    original_content = ""     # L1 미리보기 / Diff Esc 복원용 원본 내용
 
     # 처음에 포커스 가능한 아이템 찾기
     for i, (_, path) in enumerate(items):
@@ -144,6 +159,9 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     def update_toolbar():
         """현재 모드/포커스에 맞는 toolbar 힌트를 갱신한다."""
         upsert_hint = " | u: 위키 배포" if (full_plan and bookstack) else ""
+        is_agents = active_file_path and ".agents" in active_file_path
+        g_hint = " | g: L1 변환" if is_agents else ""
+        d_hint = " | d: Diff비교" if bookstack else ""
         if is_edit_mode:
             toolbar_text_control.text = (
                 " [Ctrl+S: 저장 | Esc: 편집 취소 | 내용 자유 수정 가능]"
@@ -152,13 +170,17 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             toolbar_text_control.text = (
                 " [L1 변환 미리보기 중 | Ctrl+C / ⌘+C: 클립보드 복사 | Esc: 원본 복원]"
             )
+        elif is_diff_view:
+            toolbar_text_control.text = (
+                " [Diff 뷰 중 | Ctrl+C: 복사 | Esc: 원본 복원]"
+            )
         elif current_focus == "right":
             toolbar_text_control.text = (
-                f" [e: 편집 | g: L1 변환 | Ctrl+C: 복사 | ↑/↓: 스크롤 | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
+                f" [e: 편집{g_hint}{d_hint} | Ctrl+C: 복사 | ↑/↓: 스크롤 | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
             )
         else:
             toolbar_text_control.text = (
-                f" [↑/↓: 이동+미리보기 | Enter: 편집 | g: L1 변환 | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
+                f" [↑/↓: 이동+미리보기 | Enter: 편집{g_hint}{d_hint} | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
             )
 
     def get_right_panel_title():
@@ -208,11 +230,12 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     # ─── Esc: L1 미리보기 복원 → EDIT 취소 → 뷰어 종료 순으로 처리 ───
     @kb.add("escape")
     def _(event):
-        nonlocal is_edit_mode, is_dirty, is_l1_preview
-        if is_l1_preview:
-            # L1 미리보기 중: 원본 복원
+        nonlocal is_edit_mode, is_dirty, is_l1_preview, is_diff_view
+        if is_l1_preview or is_diff_view:
+            # L1 미리보기 / Diff 뷰 중: 원본 복원
             right_text_area.text = original_content
             is_l1_preview = False
+            is_diff_view = False
             update_toolbar()
         elif is_edit_mode:
             # 편집 취소: 원본 복원
@@ -362,8 +385,12 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             except Exception as e:
                 right_text_area.text = right_text_area.text + f"\n\n[저장 오류: {e}]"
 
-    # ─── g: L1 변환 미리보기 (ADK LlmAgent 기반) ───
-    @kb.add("g", filter=Condition(lambda: not is_edit_mode and active_file_path is not None))
+    # ─── g: L1 변환 미리보기 (.agents 파일에 한정, PRD/SSD 제외) ───
+    @kb.add("g", filter=Condition(
+        lambda: not is_edit_mode
+            and active_file_path is not None
+            and ".agents" in (active_file_path or "")
+    ))
     def trigger_l1_convert(event):
         """g 키: 현재 파일을 L1 전역 정첵으로 변환하여 우측 패널에 표시한다."""
         asyncio.ensure_future(_do_l1_convert())
@@ -386,6 +413,10 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                     f" [L1 변환 중 {frames[i % 4]}  |  Esc: 취소]"
                 )
                 i += 1
+                try:
+                    get_app().invalidate()  # 화면 강제 갱신 (스피너 애니메이션)
+                except Exception:
+                    pass
                 await asyncio.sleep(0.12)
 
         spinner_task = asyncio.ensure_future(_spinner())
@@ -413,6 +444,78 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         finally:
             spinner_running = False
             spinner_task.cancel()
+        update_toolbar()
+
+    # ─── d: Diff 비교 (BookStack L1 or L2 vs 로컬) ───
+    @kb.add("d", filter=Condition(
+        lambda: not is_edit_mode
+            and active_file_path is not None
+            and bookstack is not None
+    ))
+    def trigger_diff(event):
+        """d 키: 현재 파일을 BookStack 정책과 비교하여 우측 패널에 diff 표시."""
+        asyncio.ensure_future(_do_diff())
+
+    def _extract_page_section(wiki_md: str, file_path: str) -> str:
+        """wiki_md(fetch_policies 결과)에서 현재 파일에 대응하는 섹션을 추출한다."""
+        import re
+        if "rules" in file_path:
+            page_name = os.path.basename(file_path).replace(".md", "")
+        elif "skills" in file_path:
+            page_name = os.path.basename(os.path.dirname(file_path))
+        else:
+            # PRD.md / SSD.md 등 Docs 파일: 파일명으로 매칭
+            page_name = os.path.basename(file_path).replace(".md", "")
+        pattern = rf"### {re.escape(page_name)}[^\n]*\n(.*?)(?=\n###|\Z)"
+        m = re.search(pattern, wiki_md, re.DOTALL)
+        return m.group(1).strip() if m else f"(BookStack에서 '{page_name}' 페이지를 찾을 수 없음)"
+
+    async def _do_diff():
+        """BookStack 정책과 로컬 파일을 difflib으로 비교해 우측 패널에 표시."""
+        nonlocal is_diff_view, original_content
+
+        # PRD/SSD는 L2 고정, .agents 파일은 L1/L2 선택 다이얼로그
+        is_agents = active_file_path and ".agents" in active_file_path
+        if is_agents:
+            scope = await radiolist_dialog(
+                title="Diff 대상 선택",
+                text="비교할 BookStack 정책 레벨을 선택하세요:",
+                values=[
+                    ("global",    "L1  (Global 전역 정책)"),
+                    ("workspace", "L2  (Workspace 정책)"),
+                ]
+            ).run_async()
+            if not scope:
+                return
+        else:
+            scope = "workspace"  # PRD/SSD는 L2만 존재
+
+        original_content = right_text_area.text
+        is_diff_view = True
+        right_text_area.text = f"BookStack({scope}) 와 비교 중..."
+        update_toolbar()
+
+        try:
+            wiki_md = await asyncio.to_thread(
+                bookstack.fetch_policies,
+                scope_tag=scope,
+                project_id=getattr(bookstack, "workspace_id", "")
+            )
+            wiki_section = _extract_page_section(wiki_md, active_file_path)
+            local_lines = original_content.splitlines(keepends=True)
+            wiki_lines = wiki_section.splitlines(keepends=True)
+            diff_lines = list(difflib.unified_diff(
+                wiki_lines,
+                local_lines,
+                fromfile=f"BookStack ({scope})",
+                tofile="로컬 파일",
+                lineterm=""
+            ))
+            result = "\n".join(diff_lines) if diff_lines else "차이 없음 — BookStack과 완전히 일치합니다."
+            right_text_area.text = result
+        except Exception as e:
+            right_text_area.text = f"[Diff 실패: {e}]\n\n{original_content}"
+            is_diff_view = False
         update_toolbar()
 
     # ─── Ctrl+C / CMD+C: 우측 패널 내용 클립보드 복사 (macOS pbcopy) ───

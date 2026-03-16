@@ -5,6 +5,7 @@ import logging
 import sqlite3
 import shutil
 import httpx
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Optional
 
@@ -80,7 +81,7 @@ async def run_interactive_loop(workspace: str, target_agent: str):
         f"[bold green]▶ Target Workspace: '{workspace}' / Agent: '{target_agent}'[/bold green]\n"
         "[dim]명령어가 실행된 현재 디렉토리와 BookStack 정책을 분석하여 AI 스킬/룰을 자동 생성합니다.\n"
         "종료하려면 프롬프트에서 'q'를 입력하거나 Ctrl+C를 누르세요.[/dim]",
-        title="arti-ops v0.5.1", border_style="blue"
+        title=f"arti-ops v{pkg_version('arti-ops')}", border_style="blue"
     ))
 
     def get_bottom_toolbar():
