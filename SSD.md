@@ -44,7 +44,7 @@
 
 ## 3. 시퀀스 다이어그램 (Sequence Diagram)
 
-```mermaid
+```plantuml
 @startuml
 skinparam handwritten true
 skinparam BoxPadding 10
