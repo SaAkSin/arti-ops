@@ -44,3 +44,7 @@ credentials/
 
 # Target Workspace (Local Sync Dir)
 .artiops.toml
+
+# Swarm Factory
+.agents/worktrees/
+.agents/tmp/

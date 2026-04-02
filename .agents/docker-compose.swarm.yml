@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  swarm-db:
+    image: mysql:8.0
+    container_name: arti_ops_swarm_db
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: swarm_test_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - ../docker/mysql_swarm:/var/lib/mysql
+
+  test-runner-cli:
+    image: python:3.10-slim
+    container_name: arti_ops_test_cli
+    volumes:
+      - ../worktrees/arti_cli:/workspace
+    working_dir: /workspace
+    command: tail -f /dev/null
+
+  test-runner-core:
+    image: python:3.10-slim
+    container_name: arti_ops_test_core
+    volumes:
+      - ../worktrees/arti_core:/workspace
+    working_dir: /workspace
+    command: tail -f /dev/null
+
+  test-runner-tool:
+    image: python:3.10-slim
+    container_name: arti_ops_test_tool
+    volumes:
+      - ../worktrees/arti_tool:/workspace
+    working_dir: /workspace
+    command: tail -f /dev/null
