@@ -48,3 +48,4 @@ credentials/
 # Swarm Factory
 .agents/worktrees/
 .agents/tmp/
+docker/mysql_swarm/
