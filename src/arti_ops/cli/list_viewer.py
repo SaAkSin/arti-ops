@@ -38,24 +38,32 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
 
     def get_missing_pages(folder_name):
         import re
-        pages = set([p for p, a in plan_lookup.items() if a == "MissingLocally" and p.startswith(f".agents/{folder_name}/")])
+        pages_info = {} # rel_path: origin
+        
+        for p, a in plan_lookup.items():
+            if a == "MissingLocally" and p.startswith(f".agents/{folder_name}/"):
+                pages_info[p] = "L2"
         
         cached_l1 = _policy_cache.get("global") or ""
         
         if folder_name in ["rules", "workflows"]:
             pattern = rf"### [^\n]+ \(Expected Path: \.agents/{folder_name}/([^\.]+)\.md\)"
             for match in re.finditer(pattern, cached_l1):
-                pages.add(f".agents/{folder_name}/{match.group(1)}.md")
+                p = f".agents/{folder_name}/{match.group(1)}.md"
+                if p not in pages_info:
+                    pages_info[p] = "L1"
         else:
             pattern = rf"### [^\n]+ \(Expected Path: \.agents/skills/([^\/]+)/SKILL\.md\)"
             for match in re.finditer(pattern, cached_l1):
-                pages.add(f".agents/skills/{match.group(1)}/SKILL.md")
+                p = f".agents/skills/{match.group(1)}/SKILL.md"
+                if p not in pages_info:
+                    pages_info[p] = "L1"
                 
-        final_missing = []
-        for p in pages:
+        final_missing = {}
+        for p, origin in pages_info.items():
             local_path = os.path.join(base_dir, p.replace(".agents/", ""))
             if not os.path.exists(local_path):
-                final_missing.append(p)
+                final_missing[p] = origin
                 
         return final_missing
         
@@ -72,11 +80,12 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 if action == "Create": badge = "! "
                 elif action == "Update": badge = "* "
                 elif action == "Match": badge = "  "
-            items.append((f"  {badge}{filename}", os.path.join(rules_dir, filename)))
+            items.append((f"  [L3] {badge}{filename}", os.path.join(rules_dir, filename)))
             
-        for rel_path in sorted(missing_rules):
+        for rel_path in sorted(missing_rules.keys()):
+            origin = missing_rules[rel_path]
             filename = rel_path.split("/")[-1]
-            items.append((f"  ⬇ {filename} (Remote)", None))
+            items.append((f"  [{origin}] ⬇ {filename} (Remote)", f"remote://{origin}/{rel_path}"))
 
     skills_dir = os.path.join(base_dir, "skills")
     local_skills = [d for d in os.listdir(skills_dir) if os.path.isdir(os.path.join(skills_dir, d))] if os.path.exists(skills_dir) else []
@@ -96,7 +105,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                     if action == "Create": badge = "! "
                     elif action == "Update": badge = "* "
                     elif action == "Match": badge = "  "
-                items.append((f"  {badge}{dirname} (SKILL.md)", skill_file))
+                items.append((f"  [L3] {badge}{dirname} (SKILL.md)", skill_file))
 
                 # 스크립트 등 부속 파일 탐색
                 for root, dirs, files in os.walk(skill_path):
@@ -105,15 +114,16 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                             continue
                         sub_path = os.path.join(root, file)
                         rel_sub = os.path.relpath(sub_path, skill_path)
-                        items.append((f"      ↳ {rel_sub}", sub_path))
+                        items.append((f"      ↳ [L3] {rel_sub}", sub_path))
             else:
-                items.append((f"  {dirname} (SKILL.md 누락)", None))
+                items.append((f"  [L3] {dirname} (SKILL.md 누락)", None))
                 
-        for rel_path in sorted(missing_skills):
+        for rel_path in sorted(missing_skills.keys()):
+            origin = missing_skills[rel_path]
             parts = rel_path.split("/")
             if len(parts) >= 4:
                 dirname = parts[2]
-                items.append((f"  ⬇ {dirname} (Remote)", None))
+                items.append((f"  [{origin}] ⬇ {dirname} (Remote)", f"remote://{origin}/{rel_path}"))
 
     workflows_dir = os.path.join(base_dir, "workflows")
     local_workflows = [f for f in os.listdir(workflows_dir) if f.endswith(".md")] if os.path.exists(workflows_dir) else []
@@ -130,11 +140,12 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 if action == "Create": badge = "! "
                 elif action == "Update": badge = "* "
                 elif action == "Match": badge = "  "
-            items.append((f"  {badge}{filename}", os.path.join(workflows_dir, filename)))
+            items.append((f"  [L3] {badge}{filename}", os.path.join(workflows_dir, filename)))
             
-        for rel_path in sorted(missing_workflows):
+        for rel_path in sorted(missing_workflows.keys()):
+            origin = missing_workflows[rel_path]
             filename = rel_path.split("/")[-1]
-            items.append((f"  ⬇ {filename} (Remote)", None))
+            items.append((f"  [{origin}] ⬇ {filename} (Remote)", f"remote://{origin}/{rel_path}"))
 
     # ─── Docs 섹션: PRD.md / SSD.md (L2/L3만 존재, L1 없음) ───
     project_root = os.path.dirname(base_dir)  # base_dir = .agents/ 의 부모
@@ -433,7 +444,34 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         """items[current_index]의 파일을 우측 패널에 로드한다."""
         nonlocal active_file_path
         _, path = items[current_index]
-        if path and os.path.exists(path):
+        
+        if not path:
+            return
+            
+        if path.startswith("remote://"):
+            active_file_path = None
+            import re
+            
+            parts = path.replace("remote://", "").split("/", 1)
+            origin = parts[0]
+            rel_path = parts[1]
+            
+            cache_src = _policy_cache.get("global") if origin == "L1" else (_policy_cache.get("workspace") or _policy_cache.get("global"))
+            if not cache_src:
+                right_text_area.text = "캐시에서 원본 마크다운을 찾을 수 없습니다."
+                return
+                
+            fn_desc = rel_path.split("/")[-1].replace(".md", "") if "SKILL.md" not in rel_path else rel_path.split("/")[-2]
+            
+            pattern = rf"### {fn_desc} \(Expected Path[^\n]*\)\n\n(.*?)(?=\n### |$)"
+            match = re.search(pattern, cache_src, flags=re.DOTALL)
+            if match:
+                right_text_area.text = match.group(1).strip()
+            else:
+                right_text_area.text = "본문 파싱에 실패했습니다."
+            return
+
+        if os.path.exists(path):
             active_file_path = path
             try:
                 with open(path, "r", encoding="utf-8") as f:
