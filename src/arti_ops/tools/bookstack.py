@@ -83,8 +83,8 @@ class BookStackToolset(BaseToolset):
                 
                 contents = book_detail_res.json().get("contents", [])
                 
-                # 3. rules, skills 챕터 탐색
-                for target in ["rules", "skills"]:
+                # 3. rules, skills, workflows 챕터 탐색
+                for target in ["rules", "skills", "workflows"]:
                     chapter = next((c for c in contents if c.get("type") == "chapter" and c.get("slug") == target), None)
                     
                     if not chapter:
@@ -135,7 +135,7 @@ class BookStackToolset(BaseToolset):
                             md_content = re.sub(r'---\n+$', '', md_content).strip()
 
                         # 명시적인 로컬 매핑 경로 주입
-                        if target == "rules":
+                        if target in ["rules", "workflows"]:
                             expected_path = f".agents/{target}/{page_name}.md"
                         else:  # skills 등 기타
                             expected_path = f".agents/{target}/{page_name}/SKILL.md"
@@ -233,7 +233,7 @@ class BookStackToolset(BaseToolset):
                 
                 # 2. 필수 챕터 생성
                 chapters_url = f"{self.api_url}/chapters"
-                for target in ["rules", "skills"]:
+                for target in ["rules", "skills", "workflows"]:
                     chap_payload = {
                         "book_id": book_id,
                         "name": target,
@@ -287,14 +287,16 @@ class BookStackToolset(BaseToolset):
                 
                 chapters = {
                     "rules": next((c for c in contents if c.get("type") == "chapter" and c.get("slug") == "rules"), None),
-                    "skills": next((c for c in contents if c.get("type") == "chapter" and c.get("slug") == "skills"), None)
+                    "skills": next((c for c in contents if c.get("type") == "chapter" and c.get("slug") == "skills"), None),
+                    "workflows": next((c for c in contents if c.get("type") == "chapter" and c.get("slug") == "workflows"), None)
                 }
 
                 # 3. 로컬 파일 스캔 및 비교
                 base_dir = os.path.join(os.getcwd(), ".agents")
                 targets = [
                     ("rules", os.path.join(base_dir, "rules")),
-                    ("skills", os.path.join(base_dir, "skills"))
+                    ("skills", os.path.join(base_dir, "skills")),
+                    ("workflows", os.path.join(base_dir, "workflows"))
                 ]
                 
                 for target_type, target_dir in targets:
@@ -316,12 +318,12 @@ class BookStackToolset(BaseToolset):
                     if not os.path.exists(target_dir):
                         continue
                         
-                    if target_type == "rules":
+                    if target_type in ["rules", "workflows"]:
                         for filename in os.listdir(target_dir):
                             if filename.endswith(".md"):
                                 page_name = filename[:-3]
                                 local_path = os.path.join(target_dir, filename)
-                                rel_path = f".agents/rules/{filename}"
+                                rel_path = f".agents/{target_type}/{filename}"
                                 with open(local_path, "r", encoding="utf-8") as f:
                                     content = f.read()
                                 
