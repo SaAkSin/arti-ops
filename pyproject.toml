@@ -1,6 +1,6 @@
 [project]
 name = "arti-ops"
-version = "0.5.2"
+version = "0.5.3"
 description = "로컬 컨텍스트 기반 AgentOps CLI 플랫폼"
 readme = "README.md"
 requires-python = ">=3.10"
