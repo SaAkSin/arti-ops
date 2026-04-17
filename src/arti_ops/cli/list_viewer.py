@@ -91,7 +91,10 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     local_skills = [d for d in os.listdir(skills_dir) if os.path.isdir(os.path.join(skills_dir, d))] if os.path.exists(skills_dir) else []
     missing_skills = get_missing_pages("skills")
     
-    if local_skills or missing_skills:
+    global_skills_dir = os.path.expanduser("~/.gemini/antigravity/skills")
+    global_skills = [d for d in os.listdir(global_skills_dir) if os.path.isdir(os.path.join(global_skills_dir, d))] if os.path.exists(global_skills_dir) else []
+    
+    if local_skills or missing_skills or global_skills:
         if items:
             items.append(("", None))
         items.append(("◆ Skills:", None))
@@ -117,6 +120,22 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                         items.append((f"      ↳ [L2] {rel_sub}", sub_path))
             else:
                 items.append((f"  [L2] {dirname} (SKILL.md 누락)", None))
+                
+        for dirname in sorted(global_skills):
+            skill_path = os.path.join(global_skills_dir, dirname)
+            skill_file = os.path.join(skill_path, "SKILL.md")
+            if os.path.exists(skill_file):
+                items.append((f"  [L1]   {dirname} (Global SKILL.md)", skill_file))
+                # 전역 스킬 부속 파일도 탐색
+                for root, dirs, files in os.walk(skill_path):
+                    for file in sorted(files):
+                        if file == "SKILL.md" or file.startswith("."):
+                            continue
+                        sub_path = os.path.join(root, file)
+                        rel_sub = os.path.relpath(sub_path, skill_path)
+                        items.append((f"      ↳ [L1] {rel_sub}", sub_path))
+            else:
+                items.append((f"  [L1]   {dirname} (Global SKILL.md 누락)", None))
                 
         for rel_path in sorted(missing_skills.keys()):
             origin = missing_skills[rel_path]
