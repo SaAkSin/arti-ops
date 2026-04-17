@@ -80,6 +80,23 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 else:
                     items.append((f"  {dirname} (SKILL.md 누락)", None))
 
+    workflows_dir = os.path.join(base_dir, "workflows")
+    if os.path.exists(workflows_dir):
+        if items:
+            items.append(("", None))
+        items.append(("★ Workflows:", None))
+        for filename in sorted(os.listdir(workflows_dir)):
+            if filename.endswith(".md"):
+                rel_path = f".agents/workflows/{filename}"
+                badge = "  "
+                if action := plan_lookup.get(rel_path):
+                    if action == "Create": badge = "! "
+                    elif action == "Update": badge = "* "
+                    elif action == "Match": badge = "  "
+                display_text = f"  {badge}{filename}"
+                file_path = os.path.join(workflows_dir, filename)
+                items.append((display_text, file_path))
+
     # ─── Docs 섹션: PRD.md / SSD.md (L2/L3만 존재, L1 없음) ───
     project_root = os.path.dirname(base_dir)  # base_dir = .agents/ 의 부모
     docs_targets = ["PRD.md", "SSD.md"]
