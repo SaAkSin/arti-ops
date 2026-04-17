@@ -19,6 +19,9 @@ from ..tools.file_io import FileIOToolset
 
 logger = logging.getLogger(__name__)
 
+# [arti_core Review] 
+# ArtiOpsPipeline은 현재 Profiler, Architect, Verifier, Executor의 4단계 고정 에이전트로 구성되어 있습니다.
+# 향후 Agentic Swarm 확장을 위해 고정된 순차 호줄(while루프) 로직을 동적 StateManager(DAG) 기반으로 리팩토링하는 것을 고려할 수 있습니다.
 class ArtiOpsPipeline:
     def __init__(self, target_project_id: str):
         self.target_project_id = target_project_id
