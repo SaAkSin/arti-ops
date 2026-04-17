@@ -33,6 +33,9 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     # 데이터 수집
     items = []  # (display_text, file_path)
 
+    # 외부에서 주입된 캐시 인스턴스를 사용, 없으면 신규 생성
+    _policy_cache = policy_cache if policy_cache is not None else PolicyCache.__new__(PolicyCache)
+
     def get_missing_pages(folder_name):
         import re
         pages = set([p for p, a in plan_lookup.items() if a == "MissingLocally" and p.startswith(f".agents/{folder_name}/")])
@@ -161,8 +164,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     is_pipeline_view = False  # 파이프라인 재실행 결과 표시 중인지 여부
     original_content = ""     # L1 미리보기 / Diff / 파이프라인 Esc 복원용 원본 내용
 
-    # 외부에서 주입된 캐시 인스턴스를 사용, 없으면 신규 생성
-    _policy_cache = policy_cache if policy_cache is not None else PolicyCache.__new__(PolicyCache)
+
 
     # 처음에 포커스 가능한 아이템 찾기
     for i, (_, path) in enumerate(items):
