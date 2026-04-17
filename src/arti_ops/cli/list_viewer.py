@@ -33,69 +33,105 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     # 데이터 수집
     items = []  # (display_text, file_path)
 
+    def get_missing_pages(folder_name):
+        import re
+        pages = set([p for p, a in plan_lookup.items() if a == "MissingLocally" and p.startswith(f".agents/{folder_name}/")])
+        
+        cached_l1 = _policy_cache.get("global") or ""
+        
+        if folder_name in ["rules", "workflows"]:
+            pattern = rf"### [^\n]+ \(Expected Path: \.agents/{folder_name}/([^\.]+)\.md\)"
+            for match in re.finditer(pattern, cached_l1):
+                pages.add(f".agents/{folder_name}/{match.group(1)}.md")
+        else:
+            pattern = rf"### [^\n]+ \(Expected Path: \.agents/skills/([^\/]+)/SKILL\.md\)"
+            for match in re.finditer(pattern, cached_l1):
+                pages.add(f".agents/skills/{match.group(1)}/SKILL.md")
+                
+        final_missing = []
+        for p in pages:
+            local_path = os.path.join(base_dir, p.replace(".agents/", ""))
+            if not os.path.exists(local_path):
+                final_missing.append(p)
+                
+        return final_missing
+        
     rules_dir = os.path.join(base_dir, "rules")
-    if os.path.exists(rules_dir):
+    local_rules = [f for f in os.listdir(rules_dir) if f.endswith(".md")] if os.path.exists(rules_dir) else []
+    missing_rules = get_missing_pages("rules")
+    
+    if local_rules or missing_rules:
         items.append(("● Rules:", None))
-        for filename in sorted(os.listdir(rules_dir)):
-            if filename.endswith(".md"):
-                rel_path = f".agents/rules/{filename}"
+        for filename in sorted(local_rules):
+            rel_path = f".agents/rules/{filename}"
+            badge = "  "
+            if action := plan_lookup.get(rel_path):
+                if action == "Create": badge = "! "
+                elif action == "Update": badge = "* "
+                elif action == "Match": badge = "  "
+            items.append((f"  {badge}{filename}", os.path.join(rules_dir, filename)))
+            
+        for rel_path in sorted(missing_rules):
+            filename = rel_path.split("/")[-1]
+            items.append((f"  ⬇ {filename} (Remote)", None))
+
+    skills_dir = os.path.join(base_dir, "skills")
+    local_skills = [d for d in os.listdir(skills_dir) if os.path.isdir(os.path.join(skills_dir, d))] if os.path.exists(skills_dir) else []
+    missing_skills = get_missing_pages("skills")
+    
+    if local_skills or missing_skills:
+        if items:
+            items.append(("", None))
+        items.append(("◆ Skills:", None))
+        for dirname in sorted(local_skills):
+            skill_path = os.path.join(skills_dir, dirname)
+            skill_file = os.path.join(skill_path, "SKILL.md")
+            if os.path.exists(skill_file):
+                rel_path = f".agents/skills/{dirname}/SKILL.md"
                 badge = "  "
                 if action := plan_lookup.get(rel_path):
                     if action == "Create": badge = "! "
                     elif action == "Update": badge = "* "
                     elif action == "Match": badge = "  "
+                items.append((f"  {badge}{dirname} (SKILL.md)", skill_file))
 
-                display_text = f"  {badge}{filename}"
-                file_path = os.path.join(rules_dir, filename)
-                items.append((display_text, file_path))
-
-    skills_dir = os.path.join(base_dir, "skills")
-    if os.path.exists(skills_dir):
-        if items:
-            items.append(("", None))  # 공백
-        items.append(("◆ Skills:", None))
-        for dirname in sorted(os.listdir(skills_dir)):
-            skill_path = os.path.join(skills_dir, dirname)
-            if os.path.isdir(skill_path):
-                skill_file = os.path.join(skill_path, "SKILL.md")
-                if os.path.exists(skill_file):
-                    rel_path = f".agents/skills/{dirname}/SKILL.md"
-                    badge = "  "
-                    if action := plan_lookup.get(rel_path):
-                        if action == "Create": badge = "! "
-                        elif action == "Update": badge = "* "
-                        elif action == "Match": badge = "  "
-                    display_text = f"  {badge}{dirname} (SKILL.md)"
-                    items.append((display_text, skill_file))
-
-                    # 스크립트 등 부속 파일 탐색
-                    for root, dirs, files in os.walk(skill_path):
-                        for file in sorted(files):
-                            if file == "SKILL.md" or file.startswith("."):
-                                continue
-
-                            sub_path = os.path.join(root, file)
-                            rel_sub = os.path.relpath(sub_path, skill_path)
-                            items.append((f"      ↳ {rel_sub}", sub_path))
-                else:
-                    items.append((f"  {dirname} (SKILL.md 누락)", None))
+                # 스크립트 등 부속 파일 탐색
+                for root, dirs, files in os.walk(skill_path):
+                    for file in sorted(files):
+                        if file == "SKILL.md" or file.startswith("."):
+                            continue
+                        sub_path = os.path.join(root, file)
+                        rel_sub = os.path.relpath(sub_path, skill_path)
+                        items.append((f"      ↳ {rel_sub}", sub_path))
+            else:
+                items.append((f"  {dirname} (SKILL.md 누락)", None))
+                
+        for rel_path in sorted(missing_skills):
+            parts = rel_path.split("/")
+            if len(parts) >= 4:
+                dirname = parts[2]
+                items.append((f"  ⬇ {dirname} (Remote)", None))
 
     workflows_dir = os.path.join(base_dir, "workflows")
-    if os.path.exists(workflows_dir):
+    local_workflows = [f for f in os.listdir(workflows_dir) if f.endswith(".md")] if os.path.exists(workflows_dir) else []
+    missing_workflows = get_missing_pages("workflows")
+    
+    if local_workflows or missing_workflows:
         if items:
             items.append(("", None))
         items.append(("★ Workflows:", None))
-        for filename in sorted(os.listdir(workflows_dir)):
-            if filename.endswith(".md"):
-                rel_path = f".agents/workflows/{filename}"
-                badge = "  "
-                if action := plan_lookup.get(rel_path):
-                    if action == "Create": badge = "! "
-                    elif action == "Update": badge = "* "
-                    elif action == "Match": badge = "  "
-                display_text = f"  {badge}{filename}"
-                file_path = os.path.join(workflows_dir, filename)
-                items.append((display_text, file_path))
+        for filename in sorted(local_workflows):
+            rel_path = f".agents/workflows/{filename}"
+            badge = "  "
+            if action := plan_lookup.get(rel_path):
+                if action == "Create": badge = "! "
+                elif action == "Update": badge = "* "
+                elif action == "Match": badge = "  "
+            items.append((f"  {badge}{filename}", os.path.join(workflows_dir, filename)))
+            
+        for rel_path in sorted(missing_workflows):
+            filename = rel_path.split("/")[-1]
+            items.append((f"  ⬇ {filename} (Remote)", None))
 
     # ─── Docs 섹션: PRD.md / SSD.md (L2/L3만 존재, L1 없음) ───
     project_root = os.path.dirname(base_dir)  # base_dir = .agents/ 의 부모
