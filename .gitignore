@@ -48,5 +48,5 @@ credentials/
 # Swarm Factory & Graphify
 .agents/worktrees/
 .agents/tmp/
-.agents/raw/
 .graphify/
+graphify-out/

@@ -11,4 +11,4 @@ done
 
 # 마스터 베이스라인이 갱신되었으므로 지식 그래프 최신화 (캐시 기반 0.1초 고속 갱신)
 echo "Updating Global Knowledge Graph..."
-(cd "$ROOT_DIR" && graphify --update || true)
+(cd "$ROOT_DIR" && graphify update ./ || true)
