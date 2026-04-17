@@ -42,7 +42,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         
         for p, a in plan_lookup.items():
             if a == "MissingLocally" and p.startswith(f".agents/{folder_name}/"):
-                pages_info[p] = "L2"
+                pages_info[p] = "G2"
         
         cached_l1 = _policy_cache.get("global") or ""
         
@@ -51,13 +51,13 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             for match in re.finditer(pattern, cached_l1):
                 p = f".agents/{folder_name}/{match.group(1)}.md"
                 if p not in pages_info:
-                    pages_info[p] = "L1"
+                    pages_info[p] = "G1"
         else:
             pattern = rf"### [^\n]+ \(Expected Path: \.agents/skills/([^\/]+)/SKILL\.md\)"
             for match in re.finditer(pattern, cached_l1):
                 p = f".agents/skills/{match.group(1)}/SKILL.md"
                 if p not in pages_info:
-                    pages_info[p] = "L1"
+                    pages_info[p] = "G1"
                 
         final_missing = {}
         for p, origin in pages_info.items():
@@ -80,7 +80,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 if action == "Create": badge = "! "
                 elif action == "Update": badge = "* "
                 elif action == "Match": badge = "  "
-            items.append((f"  [L3] {badge}{filename}", os.path.join(rules_dir, filename)))
+            items.append((f"  [L2] {badge}{filename}", os.path.join(rules_dir, filename)))
             
         for rel_path in sorted(missing_rules.keys()):
             origin = missing_rules[rel_path]
@@ -105,7 +105,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                     if action == "Create": badge = "! "
                     elif action == "Update": badge = "* "
                     elif action == "Match": badge = "  "
-                items.append((f"  [L3] {badge}{dirname} (SKILL.md)", skill_file))
+                items.append((f"  [L2] {badge}{dirname} (SKILL.md)", skill_file))
 
                 # 스크립트 등 부속 파일 탐색
                 for root, dirs, files in os.walk(skill_path):
@@ -114,9 +114,9 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                             continue
                         sub_path = os.path.join(root, file)
                         rel_sub = os.path.relpath(sub_path, skill_path)
-                        items.append((f"      ↳ [L3] {rel_sub}", sub_path))
+                        items.append((f"      ↳ [L2] {rel_sub}", sub_path))
             else:
-                items.append((f"  [L3] {dirname} (SKILL.md 누락)", None))
+                items.append((f"  [L2] {dirname} (SKILL.md 누락)", None))
                 
         for rel_path in sorted(missing_skills.keys()):
             origin = missing_skills[rel_path]
@@ -129,7 +129,10 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     local_workflows = [f for f in os.listdir(workflows_dir) if f.endswith(".md")] if os.path.exists(workflows_dir) else []
     missing_workflows = get_missing_pages("workflows")
     
-    if local_workflows or missing_workflows:
+    global_workflows_dir = os.path.expanduser("~/.gemini/antigravity/global_workflows")
+    global_workflows = [f for f in os.listdir(global_workflows_dir) if f.endswith(".md")] if os.path.exists(global_workflows_dir) else []
+    
+    if local_workflows or missing_workflows or global_workflows:
         if items:
             items.append(("", None))
         items.append(("★ Workflows:", None))
@@ -140,7 +143,10 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 if action == "Create": badge = "! "
                 elif action == "Update": badge = "* "
                 elif action == "Match": badge = "  "
-            items.append((f"  [L3] {badge}{filename}", os.path.join(workflows_dir, filename)))
+            items.append((f"  [L2] {badge}{filename}", os.path.join(workflows_dir, filename)))
+            
+        for filename in sorted(global_workflows):
+            items.append((f"  [L1]   {filename} (Global)", os.path.join(global_workflows_dir, filename)))
             
         for rel_path in sorted(missing_workflows.keys()):
             origin = missing_workflows[rel_path]
@@ -456,7 +462,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             origin = parts[0]
             rel_path = parts[1]
             
-            cache_src = _policy_cache.get("global") if origin == "L1" else (_policy_cache.get("workspace") or _policy_cache.get("global"))
+            cache_src = _policy_cache.get("global") if origin == "G1" else (_policy_cache.get("workspace") or _policy_cache.get("global"))
             if not cache_src:
                 right_text_area.text = "캐시에서 원본 마크다운을 찾을 수 없습니다."
                 return
