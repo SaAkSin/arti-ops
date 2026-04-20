@@ -259,10 +259,10 @@ class BookStackToolset(BaseToolset):
                 logger.error(f"Failed to create workspace book: {e}")
                 raise ValueError(f"워크스페이스 생성 실패: {e}")
 
-    async def get_upsert_plan(self, project_id: str) -> list[dict]:
+    async def get_upsert_plan(self, project_id: Optional[str] = None, scope: str = "workspace") -> list[dict]:
         """로컬 .agents 데이터를 스캔하고 BookStack과 비교하여 배포 계획을 생성합니다."""
         plan = []
-        book_slug = f"workspace-{project_id}"
+        book_slug = f"workspace-{project_id}" if scope == "workspace" else "antigravity-global-policy"
         
         async with httpx.AsyncClient() as client:
             headers = self.get_headers()
@@ -293,11 +293,16 @@ class BookStackToolset(BaseToolset):
 
                 # 3. 로컬 파일 스캔 및 비교
                 base_dir = os.path.join(os.getcwd(), ".agents")
-                targets = [
-                    ("rules", os.path.join(base_dir, "rules")),
-                    ("skills", os.path.join(base_dir, "skills")),
-                    ("workflows", os.path.join(base_dir, "workflows"))
-                ]
+                if scope == "global":
+                    targets = [
+                        ("skills", os.path.join(base_dir, ".global_skills"))
+                    ]
+                else:
+                    targets = [
+                        ("rules", os.path.join(base_dir, "rules")),
+                        ("skills", os.path.join(base_dir, "skills")),
+                        ("workflows", os.path.join(base_dir, "workflows"))
+                    ]
                 
                 for target_type, target_dir in targets:
                     chapter = chapters.get(target_type)
@@ -344,7 +349,10 @@ class BookStackToolset(BaseToolset):
                             if os.path.isdir(skill_dir):
                                 skill_file = os.path.join(skill_dir, "SKILL.md")
                                 if os.path.exists(skill_file):
-                                    rel_path = f".agents/skills/{skill_name}/SKILL.md"
+                                    if scope == "global":
+                                        rel_path = f".agents/.global_skills/{skill_name}/SKILL.md"
+                                    else:
+                                        rel_path = f".agents/skills/{skill_name}/SKILL.md"
                                     with open(skill_file, "r", encoding="utf-8") as f:
                                         content = f.read()
                                         

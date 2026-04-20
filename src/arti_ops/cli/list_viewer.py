@@ -287,9 +287,10 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
 
     def update_toolbar():
         """현재 모드/포커스에 맞는 toolbar 힌트를 갱신한다."""
-        upsert_hint = " | u: 위키 배포" if (full_plan and bookstack) else ""
+        upsert_hint = " | u: L2 -> G2 배포" if (full_plan and bookstack) else ""
+        g_hint = " | g: L1 -> G1 배포" if (full_plan and bookstack) else ""
         is_agents = active_file_path and ".agents" in active_file_path
-        g_hint = " | g: L1 변환" if is_agents else ""
+        c_hint = " | c: L2 -> L1 변환" if is_agents else ""
         d_hint = " | d: Diff비교" if bookstack else ""
         p_hint = " | p: 파이프라인" if is_agents else ""
         if is_edit_mode:
@@ -310,11 +311,11 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             )
         elif current_focus == "right":
             toolbar_text_control.text = (
-                f" [e: 편집{g_hint}{d_hint}{p_hint} | Ctrl+C: 복사 | ↑/↓: 스크롤 | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
+                f" [e: 편집{c_hint}{d_hint}{p_hint} | Ctrl+C: 복사 | ↑/↓: 스크롤 | Tab: 뷰 전환{g_hint}{upsert_hint} | q/Esc: 닫기]"
             )
         else:
             toolbar_text_control.text = (
-                f" [↑/↓: 이동+미리보기 | Enter: 편집{g_hint}{d_hint}{p_hint} | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
+                f" [↑/↓: 이동+미리보기 | Enter: 편집{c_hint}{d_hint}{p_hint} | Tab: 뷰 전환{g_hint}{upsert_hint} | q/Esc: 닫기]"
             )
 
     def get_right_panel_title():
@@ -491,7 +492,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     ))
     def trigger_upsert(event):
         """l 뷰어를 일시 종료 후 upsert 다이얼로그를 실행하고 발어 재진입한다."""
-        event.app.exit(result="upsert_requested")
+        event.app.exit(result="upsert_workspace_requested")
 
     # ─── _load_preview: 파일 로드 헬퍼 (자동 미리보기 및 Enter 진입에서 공유) ───
     def _load_preview():
@@ -613,14 +614,22 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             except Exception as e:
                 right_text_area.text = right_text_area.text + f"\n\n[저장 오류: {e}]"
 
-    # ─── g: L1 변환 미리보기 (.agents 파일에 한정, PRD/SSD 제외) ───
+    # ─── g: G1 등반 (L1 -> G1 BookStack Upsert) ───
     @kb.add("g", filter=Condition(
+        lambda: full_plan is not None and bookstack is not None and not is_edit_mode
+    ))
+    def trigger_global_upsert(event):
+        """l 뷰어를 일시 종료하고 L1 글로벌 스킬을 BookStack 마스터(G1)로 배포하는 다이얼로그를 띄운다."""
+        event.app.exit(result="upsert_global_requested")
+
+    # ─── c: L1 변환 미리보기 (.agents 파일에 한정, PRD/SSD 제외) ───
+    @kb.add("c", filter=Condition(
         lambda: not is_edit_mode
             and active_file_path is not None
             and ".agents" in (active_file_path or "")
     ))
     def trigger_l1_convert(event):
-        """g 키: 현재 파일을 L1 전역 정첵으로 변환하여 우측 패널에 표시한다."""
+        """c 키: 현재 파일을 L1 전역 정첵으로 변환하여 우측 패널에 표시한다."""
         asyncio.ensure_future(_do_l1_convert())
 
     async def _do_l1_convert():
@@ -660,7 +669,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 user_id="viewer",
                 session_id="l1_convert",
                 new_message=Content(role="user", parts=[
-                    Part.from_text(text=f"다음 L3 콘텐츠를 L1 전역 정책으로 변환해주세요:\n\n{original_content}")
+                    Part.from_text(text=f"다음 L3/L2 콘텐츠를 L1 전역 정책으로 변환해주세요:\n\n{original_content}")
                 ])
             ):
                 if event.is_final_response():
@@ -882,13 +891,32 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         app.timeoutlen = 0.05  # Esc 응답 지연 단축: 기본 500ms → 50ms
         result = await app.run_async()
 
-        # u 키로 요청된 경우: 다이얼로그 실행 후 배지 갱신 후 늉어로 복귀
-        if result == "upsert_requested" and full_plan and bookstack:
+        # u 키로 요청된 경우: 다이얼로그 실행 후 배지 갱신 후 뷰어로 복귀
+        if result in ("upsert_workspace_requested", "upsert_global_requested") and bookstack:
             def get_symbol(action):
                 return {"Create": "!", "Update": "*", "Match": " "}.get(action, " ")
 
             choices = []
-            for item in full_plan:
+            
+            if result == "upsert_workspace_requested" and full_plan:
+                plan_to_use = full_plan
+                dialog_title = "위키 연동 (BookStack Workspace Upsert)"
+                dialog_text = (
+                    "방향키(↑/↓)와 스페이스바(Space)로 워크스페이스(G2)로 배포할 L2 스킬을 선택하세요.\n"
+                    "[ ! : 신규 추가 | * : 업데이트 대상 | 공백 : 완전 동일 ]"
+                )
+            else:
+                # global plan generate on the fly
+                import logging
+                logging.getLogger(__name__).info("Fetching global plan...")
+                plan_to_use = await bookstack.get_upsert_plan(project_id="global", scope="global")
+                dialog_title = "위키 연동 (BookStack Global Upsert)"
+                dialog_text = (
+                    "방향키(↑/↓)와 스페이스바(Space)로 마스터 영역(G1)으로 배포할 L1 스킬을 선택하세요.\n"
+                    "[ ! : 신규 추가 | * : 업데이트 대상 | 공백 : 완전 동일 ]"
+                )
+
+            for item in plan_to_use:
                 # Match(위키와 동일) 항목은 배포 대상이 아니므로 제외
                 if item.get("action") == "Match":
                     continue
@@ -905,14 +933,22 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                                 display_text += f"\n      ↳ {rel_sub}"
                 choices.append((item, display_text))
 
+            if not choices:
+                from prompt_toolkit.shortcuts import message_dialog
+                await asyncio.to_thread(
+                    message_dialog(
+                        title="알림",
+                        text="현재 배포(Update/Create)할 항목이 없습니다. (위키와 완전 동일)",
+                        style=upsert_style
+                    ).run
+                )
+                continue
+
             # 다이얼로그를 Application 밖에서 (실행 중인 App 없음) 실행 → 스타일 정상 적용
             selected = await asyncio.to_thread(
                 checkboxlist_dialog(
-                    title="위키 연동 (BookStack Upsert)",
-                    text=(
-                        "방향키(↑/↓)와 스페이스바(Space)로 배포할 항목을 선택하세요.\n"
-                        "[ ! : 신규 추가 | * : 위키와 로컈 내용 다름 (업데이트 대상) | 공백 : 컨텐츠 완전 동일 (수정 불필요) ]"
-                    ),
+                    title=dialog_title,
+                    text=dialog_text,
                     values=choices,
                     style=upsert_style
                 ).run
@@ -920,12 +956,13 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
 
             if selected:
                 await bookstack.execute_upsert(selected)
-                for item in selected:
-                    plan_lookup[item["rel_path"]] = "Match"
+                if result == "upsert_workspace_requested":
+                    for item in selected:
+                        plan_lookup[item["rel_path"]] = "Match"
                 rebuild_items_badges()
                 update_left_pane()
 
-            # 선택함/안 함/취소 모두 누어로 복귀
+            # 선택함/안 함/취소 모두 뷰어로 복귀
             continue
 
         # q/Esc/Enter 등 일반 종료 → 루프 탈출
