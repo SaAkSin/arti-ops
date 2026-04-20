@@ -304,19 +304,29 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             dirty_mark = " [미저장 *]" if is_dirty else ""
             return f"▶ 파일 편집 중 ✏️{dirty_mark}"
         elif current_focus == "right":
-            return "▶ 파일 미리보기 (포커스됨)"
+            return "▶ 파일 미리보기"
         return "파일 미리보기"
 
     def get_right_container():
         """diff_view 여부에 따라 우측 패널 컴포넌트를 동적으로 전환한다."""
         return diff_text_area if is_diff_view else right_text_area
 
+    # 왼쪽 목록 창 유지 (상태 유지 위해 별도 할당)
+    left_window = Window(content=left_text_control, wrap_lines=False, width=40)
+
+    def get_left_frame():
+        if current_focus == "left":
+            return Frame(left_window, title="▶ 로컬 파일 목록", style="class:focused-frame")
+        return Frame(left_window, title="로컬 파일 목록", style="")
+
+    def get_right_frame():
+        if current_focus == "right":
+            return Frame(DynamicContainer(get_right_container), title=get_right_panel_title(), style="class:focused-frame")
+        return Frame(DynamicContainer(get_right_container), title=get_right_panel_title(), style="")
+
     body = VSplit([
-        Frame(
-            Window(content=left_text_control, wrap_lines=False, width=40),
-            title=lambda: "▶ 로컬 파일 목록 (포커스됨)" if current_focus == "left" else "로컬 파일 목록"
-        ),
-        Frame(DynamicContainer(get_right_container), title=get_right_panel_title)
+        DynamicContainer(get_left_frame),
+        DynamicContainer(get_right_frame)
     ])
 
     toolbar = Window(
@@ -830,11 +840,12 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             subprocess.run(["pbcopy"], input=content, text=True, check=False)
 
     # l/u 다이얼로그 색상 일치: 두 구역 모두 터미널 기본 배경을 사용
-    viewer_style = Style([
-        ('bottom-toolbar', 'bg:#333333 #ffffff'),
-        ('selected',       'bg:#00aa00 #ffffff bold'),
-        ('header',         'bold #00ffff'),
-    ])
+    viewer_style = Style.from_dict({
+        'bottom-toolbar': 'reverse',
+        'selected':       'bg:#00aa00 #ffffff bold',
+        'header':         'bold #00ffff',
+        'focused-frame frame.border': 'fg:cyan bold',
+    })
 
     # ─── 초기 자동 로드: 첫 유효 항목을 우측 패널에 자동 표시 ───
     _load_preview()
