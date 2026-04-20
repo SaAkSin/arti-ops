@@ -227,16 +227,35 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
 
     def update_left_pane():
         """좌측 목록 배지를 plan_lookup 기준으로 다시 렌더링한다."""
-        # 아이템 목록의 배지를 최신 plan_lookup 기준으로 재계산
         formatted_text = []
-        item_idx = 0
         for i, (text, path) in enumerate(items):
-            if i == current_index and path:
-                formatted_text.append(("class:selected", f"> {text}\n"))
-            elif path:
-                formatted_text.append(("", f"  {text}\n"))
+            # 편집 가능 여부 판단
+            is_editable = True
+            if not path:
+                is_editable = False
+            elif "[G1]" in text or "[G2]" in text:
+                is_editable = False
+            elif "[L1]" in text or "[L2]" in text:
+                is_editable = True
+            elif path.startswith("remote://"):
+                is_editable = False
             else:
-                formatted_text.append(("class:header", f"{text}\n"))
+                try:
+                    rel = os.path.relpath(path, os.path.dirname(base_dir)).replace("\\", "/")
+                    if plan_lookup.get(rel) == "Match":
+                        is_editable = False
+                except Exception:
+                    pass
+
+            if not path:
+                formatted_text.append(("class:header fg:darkgray", f"{text}\n"))
+            elif i == current_index:
+                # selected 상태에서는 기본 하이라이트 유지 (충돌 방지)
+                formatted_text.append(("class:selected", f"> {text}\n"))
+            else:
+                style_str = "" if is_editable else "fg:darkgray"
+                formatted_text.append((style_str, f"  {text}\n"))
+                
         left_text_control.text = formatted_text
 
     def rebuild_items_badges():
@@ -849,6 +868,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
 
     # ─── 초기 자동 로드: 첫 유효 항목을 우측 패널에 자동 표시 ───
     _load_preview()
+    update_toolbar()
 
     # ─── Application 루프: upsert 후 런타임에 재진입 ───
     # Application 인스턴스는 재사용이 불가하므로 루프 내에서 매번 생성
