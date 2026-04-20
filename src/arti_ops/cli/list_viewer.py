@@ -342,7 +342,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     @kb.add("q", filter=Condition(lambda: not is_edit_mode))
     def _(event):
         try:
-            _policy_cache.clear()
+            # _policy_cache.clear() # 성능 최적화를 위해 캐시 유지
             _policy_cache.close()
             event.app.exit()
         except Exception:
@@ -376,7 +376,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         else:
             # 뷰어 종료
             try:
-                _policy_cache.clear()
+                # _policy_cache.clear() # 성능 최적화를 위해 캐시 유지
                 _policy_cache.close()
                 event.app.exit()
             except Exception:
@@ -482,25 +482,54 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             rel_path = parts[1]
             
             cache_src = _policy_cache.get("global") if origin == "G1" else (_policy_cache.get("workspace") or _policy_cache.get("global"))
-            if not cache_src:
-                right_text_area.text = "캐시에서 원본 마크다운을 찾을 수 없습니다."
-                return
-                
             fn_desc = rel_path.split("/")[-1].replace(".md", "") if "SKILL.md" not in rel_path else rel_path.split("/")[-2]
-            
             pattern = rf"### {fn_desc} \(Expected Path[^\n]*\)\n\n(.*?)(?=\n### |$)"
-            match = re.search(pattern, cache_src, flags=re.DOTALL)
-            if match:
-                right_text_area.text = match.group(1).strip()
+
+            if cache_src:
+                match = re.search(pattern, cache_src, flags=re.DOTALL)
+                if match:
+                    right_text_area.text = match.group(1).strip().replace("\r", "")
+                else:
+                    right_text_area.text = "본문 파싱에 실패했습니다."
             else:
-                right_text_area.text = "본문 파싱에 실패했습니다."
+                right_text_area.text = "캐시에 원본이 없습니다. BookStack에서 로드 중..."
+
+                async def _lazy_load_remote():
+                    try:
+                        scope = "global" if origin == "G1" else "workspace"
+                        pid = project_id if scope == "workspace" else None
+                        
+                        wiki_md = await bookstack.fetch_policies(scope_tag=scope, project_id=pid)
+                        _policy_cache.set(scope, wiki_md, pid or "")
+                        
+                        _, current_path = items[current_index]
+                        if current_path == path:
+                            match = re.search(pattern, wiki_md, flags=re.DOTALL)
+                            if match:
+                                right_text_area.text = match.group(1).strip().replace("\r", "")
+                            else:
+                                right_text_area.text = "본문 파싱에 실패했습니다."
+                            try:
+                                get_app().invalidate()
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        _, current_path = items[current_index]
+                        if current_path == path:
+                            right_text_area.text = f"로드 실패: {e}"
+                            try:
+                                get_app().invalidate()
+                            except Exception:
+                                pass
+
+                asyncio.ensure_future(_lazy_load_remote())
             return
 
         if os.path.exists(path):
             active_file_path = path
             try:
                 with open(path, "r", encoding="utf-8") as f:
-                    right_text_area.text = f.read()
+                    right_text_area.text = f.read().replace("\r", "")
             except Exception as e:
                 right_text_area.text = f"파일을 읽는 중 오류: {e}"
 

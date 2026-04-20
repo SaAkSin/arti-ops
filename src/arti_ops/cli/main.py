@@ -126,9 +126,13 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     except Exception as e:
                         logger.error(f"Failed to reset session in DB: {e}")
                 
-                # 파이프라인 및 세션 서비스 즉시 재생성
+                # 파이프라인 및 북스택/정책 캐시 즉시 리셋
                 pipeline = ArtiOpsPipeline(target_project_id=workspace)
-                console.print("\n[bold yellow]🔄 sessions.db 캐시가 초기화되었습니다. 완전히 백지 상태에서 새로 시작합니다![/bold yellow]")
+                try:
+                    PolicyCache(get_db_url()).clear()
+                except Exception as e:
+                    pass
+                console.print("\n[bold yellow]🔄 세션 및 BookStack 정책 캐시가 모두 초기화되었습니다. 완전히 백지 상태에서 새로 시작합니다![/bold yellow]")
                 continue
                 
             # BookStack Upsert 동기화
@@ -221,33 +225,39 @@ async def run_interactive_loop(workspace: str, target_agent: str):
                     console.print("\n[yellow]▼ 현재 로컬에 수집/배포된 룰이나 스킬이 없습니다. (.agents 폴더 없음)[/yellow]")
                     continue
 
-                # 세션 캐시 초기화 (이전 세션 잔여 데이터 제거)
+                # 세션 캐시 초기화 방지 (성능 최적화: r 명령어로만 강제 초기화)
                 _viewer_cache = PolicyCache(get_db_url())
-                _viewer_cache.clear()
+                #_viewer_cache.clear()
 
                 bookstack = BookStackToolset()
 
-                # get_upsert_plan + fetch_policies("global"/"workspace") 병렬 사전 로딩
-                # → d(L2)/D(L1) 키 첫 입력 시 캐시 HIT으로 즉시 응답
-                with console.status("[cyan]BookStack 위키와 로컬 현황 및 L1/L2 정책을 병렬로 로드 중입니다...[/cyan]", spinner="dots"):
-                    try:
-                        plan, global_policies, workspace_policies = await asyncio.gather(
-                            bookstack.get_upsert_plan(workspace),
-                            bookstack.fetch_policies(scope_tag="global"),
-                            bookstack.fetch_policies(scope_tag="workspace", project_id=workspace)
-                        )
-                        _viewer_cache.set("upsert_plan", json.dumps(plan, ensure_ascii=False), workspace)
-                        _viewer_cache.set("global", global_policies)
-                        _viewer_cache.set("workspace", workspace_policies, workspace)
-                    except ValueError as e:
-                        console.print(f"\n[bold yellow]⚠ {e}[/bold yellow]")
-                        _viewer_cache.close()
-                        continue
-                    except Exception as e:
-                        console.print(f"\n[bold yellow]⚠ 정책 로드 실패 (Diff/파이프라인 기능 제한됨): {e}[/bold yellow]")
-                        if not plan:
+                # 캐시 확인 (G1 템플릿과 현황 비교 용도)
+                cached_plan = _viewer_cache.get("upsert_plan", workspace)
+                cached_global = _viewer_cache.get("global")
+
+                if not cached_plan or not cached_global:
+                    with console.status("[cyan]BookStack 초기 가동: 캐시가 비어 원격 데이터를 수집합니다.[/cyan]", spinner="dots") as status:
+                        try:
+                            # 단계 1: 로컬 현황(Upsert Plan) 조회
+                            if not cached_plan:
+                                status.update("[cyan]Step 1/2: 로컬 에셋(Upsert Plan) 현황을 분석하고 있습니다...[/cyan]")
+                                plan = await bookstack.get_upsert_plan(workspace)
+                                _viewer_cache.set("upsert_plan", json.dumps(plan, ensure_ascii=False), workspace)
+                            else:
+                                plan = json.loads(cached_plan)
+                                
+                            # 단계 2: 글로벌(G1) 정책 조회
+                            if not cached_global:
+                                status.update("[cyan]Step 2/2: 글로벌(G1) 지식 그래프를 맵핑 중입니다...[/cyan]")
+                                global_policies = await bookstack.fetch_policies(scope_tag="global")
+                                _viewer_cache.set("global", global_policies)
+                        except Exception as e:
+                            console.print(f"\n[bold yellow]⚠ 정책 로드 실패: {e}[/bold yellow]")
                             _viewer_cache.close()
                             continue
+                else:
+                    # 캐시가 모두 존재하면 즉시 로드 (0.1초 컷)
+                    plan = json.loads(cached_plan)
 
 
                 # 룩업 딕셔너리 생성 (rel_path: action)
