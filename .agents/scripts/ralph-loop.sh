@@ -10,8 +10,20 @@ fi
 
 FAIL_COUNT=$(cat "$FAIL_LOG")
 
+AGENT_WORKTREE=".agents/worktrees/$AGENT_NAME"
+TEST_CMD=".venv/bin/pytest tests/"
+
+if [ -d "$AGENT_WORKTREE" ]; then
+    if [ -n "$(git -C "$AGENT_WORKTREE" status --porcelain)" ]; then
+        echo "🚨 [Ralph-Loop 차단] 격리 워크트리($AGENT_WORKTREE)에 커밋되지 않은 코드(Dirty State)가 있습니다."
+        echo "   👉 편법(Bypass) 방지를 위해, 워크트리 변경사항을 git commit 한 뒤 루프를 다시 실행하십시오."
+        exit 1
+    fi
+    TEST_CMD="(cd \"$AGENT_WORKTREE\" && ../../../.venv/bin/pytest tests/)"
+fi
+
 echo "Running tests for $AGENT_NAME..."
-if .venv/bin/pytest tests/; then
+if eval "$TEST_CMD"; then
     echo "Tests passed. Resetting fail count."
     echo 0 > "$FAIL_LOG"
     exit 0
