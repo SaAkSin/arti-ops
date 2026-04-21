@@ -11,7 +11,7 @@ fi
 FAIL_COUNT=$(cat "$FAIL_LOG")
 
 echo "Running tests for $AGENT_NAME..."
-if pytest tests/; then
+if .venv/bin/pytest tests/; then
     echo "Tests passed. Resetting fail count."
     echo 0 > "$FAIL_LOG"
     exit 0

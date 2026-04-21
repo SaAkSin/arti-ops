@@ -16,4 +16,4 @@ def test_verifier_agent_initialization():
     assert agent.name == "critical_verifier"
     assert "아키텍트가 작성한 기획안" in agent.instruction
     assert ".agents/rules/" in agent.instruction
-    assert agent.model == os.getenv("GEMINI_MODEL_PRO", "gemini-2.5-pro")
+    assert agent.model == os.getenv("GEMINI_MODEL_PRO", "gemini-3.1-pro-preview")

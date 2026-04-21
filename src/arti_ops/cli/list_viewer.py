@@ -24,7 +24,7 @@ except Exception:
     _DIFF_LEXER = None  # pygments 없으면 DiffLexer 없이 동작
 
 
-async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None, upsert_style=None, project_id=None, policy_cache=None):
+async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None, upsert_style=None, project_id=None, policy_cache=None, is_empty_repo=False):
     """
     plan_lookup: { "rel_path": "Create" | "Update" | "Match" }
     base_dir: .agents 디렉토리 경로
@@ -185,9 +185,12 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         for fname, fpath in docs_items:
             items.append((f"  {fname}", fpath))
 
-    if not items:
+    if not items and not is_empty_repo:
         # 비어있으면 그냥 종료
         return
+
+    if is_empty_repo:
+        items.insert(0, ("[G1] ⚠️ 정책 저장소가 비어있습니다. 'i' 키를 눌러 G1 정책을 작성하고 최초 동기화를 활성화하세요.", None))
 
     # 상태 관리
     current_index = 0
@@ -227,35 +230,16 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
 
     def update_left_pane():
         """좌측 목록 배지를 plan_lookup 기준으로 다시 렌더링한다."""
+        # 아이템 목록의 배지를 최신 plan_lookup 기준으로 재계산
         formatted_text = []
+        item_idx = 0
         for i, (text, path) in enumerate(items):
-            # 편집 가능 여부 판단
-            is_editable = True
-            if not path:
-                is_editable = False
-            elif "[G1]" in text or "[G2]" in text:
-                is_editable = False
-            elif "[L1]" in text or "[L2]" in text:
-                is_editable = True
-            elif path.startswith("remote://"):
-                is_editable = False
-            else:
-                try:
-                    rel = os.path.relpath(path, os.path.dirname(base_dir)).replace("\\", "/")
-                    if plan_lookup.get(rel) == "Match":
-                        is_editable = False
-                except Exception:
-                    pass
-
-            if not path:
-                formatted_text.append(("class:header fg:darkgray", f"{text}\n"))
-            elif i == current_index:
-                # selected 상태에서는 기본 하이라이트 유지 (충돌 방지)
+            if i == current_index and path:
                 formatted_text.append(("class:selected", f"> {text}\n"))
+            elif path:
+                formatted_text.append(("", f"  {text}\n"))
             else:
-                style_str = "" if is_editable else "fg:darkgray"
-                formatted_text.append((style_str, f"  {text}\n"))
-                
+                formatted_text.append(("class:header", f"{text}\n"))
         left_text_control.text = formatted_text
 
     def rebuild_items_badges():
@@ -287,10 +271,9 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
 
     def update_toolbar():
         """현재 모드/포커스에 맞는 toolbar 힌트를 갱신한다."""
-        upsert_hint = " | u: L2 -> G2 배포" if (full_plan and bookstack) else ""
-        g_hint = " | g: L1 -> G1 배포" if (full_plan and bookstack) else ""
+        upsert_hint = " | u: 위키 배포" if (full_plan and bookstack) else ""
         is_agents = active_file_path and ".agents" in active_file_path
-        c_hint = " | c: L2 -> L1 변환" if is_agents else ""
+        g_hint = " | g: L1 변환" if is_agents else ""
         d_hint = " | d: Diff비교" if bookstack else ""
         p_hint = " | p: 파이프라인" if is_agents else ""
         if is_edit_mode:
@@ -311,11 +294,11 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             )
         elif current_focus == "right":
             toolbar_text_control.text = (
-                f" [e: 편집{c_hint}{d_hint}{p_hint} | Ctrl+C: 복사 | ↑/↓: 스크롤 | Tab: 뷰 전환{g_hint}{upsert_hint} | q/Esc: 닫기]"
+                f" [e: 편집{g_hint}{d_hint}{p_hint} | Ctrl+C: 복사 | ↑/↓: 스크롤 | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
             )
         else:
             toolbar_text_control.text = (
-                f" [↑/↓: 이동+미리보기 | Enter: 편집{c_hint}{d_hint}{p_hint} | Tab: 뷰 전환{g_hint}{upsert_hint} | q/Esc: 닫기]"
+                f" [↑/↓: 이동+미리보기 | Enter: 편집{g_hint}{d_hint}{p_hint} | Tab: 뷰 전환{upsert_hint} | q/Esc: 닫기]"
             )
 
     def get_right_panel_title():
@@ -324,29 +307,19 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             dirty_mark = " [미저장 *]" if is_dirty else ""
             return f"▶ 파일 편집 중 ✏️{dirty_mark}"
         elif current_focus == "right":
-            return "▶ 파일 미리보기"
+            return "▶ 파일 미리보기 (포커스됨)"
         return "파일 미리보기"
 
     def get_right_container():
         """diff_view 여부에 따라 우측 패널 컴포넌트를 동적으로 전환한다."""
         return diff_text_area if is_diff_view else right_text_area
 
-    # 왼쪽 목록 창 유지 (상태 유지 위해 별도 할당)
-    left_window = Window(content=left_text_control, wrap_lines=False, width=40)
-
-    def get_left_frame():
-        if current_focus == "left":
-            return Frame(left_window, title="▶ 로컬 파일 목록", style="class:focused-frame")
-        return Frame(left_window, title="로컬 파일 목록", style="")
-
-    def get_right_frame():
-        if current_focus == "right":
-            return Frame(DynamicContainer(get_right_container), title=get_right_panel_title(), style="class:focused-frame")
-        return Frame(DynamicContainer(get_right_container), title=get_right_panel_title(), style="")
-
     body = VSplit([
-        DynamicContainer(get_left_frame),
-        DynamicContainer(get_right_frame)
+        Frame(
+            Window(content=left_text_control, wrap_lines=False, width=40),
+            title=lambda: "▶ 로컬 파일 목록 (포커스됨)" if current_focus == "left" else "로컬 파일 목록"
+        ),
+        Frame(DynamicContainer(get_right_container), title=get_right_panel_title)
     ])
 
     toolbar = Window(
@@ -372,7 +345,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     @kb.add("q", filter=Condition(lambda: not is_edit_mode))
     def _(event):
         try:
-            # _policy_cache.clear() # 성능 최적화를 위해 캐시 유지
+            _policy_cache.clear()
             _policy_cache.close()
             event.app.exit()
         except Exception:
@@ -406,7 +379,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         else:
             # 뷰어 종료
             try:
-                # _policy_cache.clear() # 성능 최적화를 위해 캐시 유지
+                _policy_cache.clear()
                 _policy_cache.close()
                 event.app.exit()
             except Exception:
@@ -492,7 +465,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
     ))
     def trigger_upsert(event):
         """l 뷰어를 일시 종료 후 upsert 다이얼로그를 실행하고 발어 재진입한다."""
-        event.app.exit(result="upsert_workspace_requested")
+        event.app.exit(result="upsert_requested")
 
     # ─── _load_preview: 파일 로드 헬퍼 (자동 미리보기 및 Enter 진입에서 공유) ───
     def _load_preview():
@@ -512,54 +485,25 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             rel_path = parts[1]
             
             cache_src = _policy_cache.get("global") if origin == "G1" else (_policy_cache.get("workspace") or _policy_cache.get("global"))
+            if not cache_src:
+                right_text_area.text = "캐시에서 원본 마크다운을 찾을 수 없습니다."
+                return
+                
             fn_desc = rel_path.split("/")[-1].replace(".md", "") if "SKILL.md" not in rel_path else rel_path.split("/")[-2]
+            
             pattern = rf"### {fn_desc} \(Expected Path[^\n]*\)\n\n(.*?)(?=\n### |$)"
-
-            if cache_src:
-                match = re.search(pattern, cache_src, flags=re.DOTALL)
-                if match:
-                    right_text_area.text = match.group(1).strip().replace("\r", "")
-                else:
-                    right_text_area.text = "본문 파싱에 실패했습니다."
+            match = re.search(pattern, cache_src, flags=re.DOTALL)
+            if match:
+                right_text_area.text = match.group(1).strip()
             else:
-                right_text_area.text = "캐시에 원본이 없습니다. BookStack에서 로드 중..."
-
-                async def _lazy_load_remote():
-                    try:
-                        scope = "global" if origin == "G1" else "workspace"
-                        pid = project_id if scope == "workspace" else None
-                        
-                        wiki_md = await bookstack.fetch_policies(scope_tag=scope, project_id=pid)
-                        _policy_cache.set(scope, wiki_md, pid or "")
-                        
-                        _, current_path = items[current_index]
-                        if current_path == path:
-                            match = re.search(pattern, wiki_md, flags=re.DOTALL)
-                            if match:
-                                right_text_area.text = match.group(1).strip().replace("\r", "")
-                            else:
-                                right_text_area.text = "본문 파싱에 실패했습니다."
-                            try:
-                                get_app().invalidate()
-                            except Exception:
-                                pass
-                    except Exception as e:
-                        _, current_path = items[current_index]
-                        if current_path == path:
-                            right_text_area.text = f"로드 실패: {e}"
-                            try:
-                                get_app().invalidate()
-                            except Exception:
-                                pass
-
-                asyncio.ensure_future(_lazy_load_remote())
+                right_text_area.text = "본문 파싱에 실패했습니다."
             return
 
         if os.path.exists(path):
             active_file_path = path
             try:
                 with open(path, "r", encoding="utf-8") as f:
-                    right_text_area.text = f.read().replace("\r", "")
+                    right_text_area.text = f.read()
             except Exception as e:
                 right_text_area.text = f"파일을 읽는 중 오류: {e}"
 
@@ -588,48 +532,61 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         right_text_area.buffer.read_only = to_filter(False)
         update_toolbar()
 
+    # ─── i: 빈 저장소 G1 초기 정책 작성 ───
+    @kb.add("i", filter=Condition(lambda: not is_edit_mode and is_empty_repo))
+    def init_empty_repo(event):
+        nonlocal current_focus, is_edit_mode, active_file_path
+        current_focus = "right"
+        is_edit_mode = True
+        right_text_area.buffer.read_only = to_filter(False)
+        active_file_path = os.path.expanduser("~/.arti-ops/policies/G1_Master.md")
+        right_text_area.text = "---\nscope: G1\ntype: System\npurpose: all\ntitle: Global Master Rule\n---\n여기에 첫 번째 G1 원칙을 자유롭게 작성해 주세요...\n"
+        try:
+            get_app().layout.focus(right_text_area)
+        except Exception:
+            pass
+        update_toolbar()
+
     # ─── Ctrl+S: 저장 (EDIT 모드에서만) ───
     @kb.add("c-s", filter=Condition(lambda: is_edit_mode))
     def save_file(event):
-        nonlocal is_dirty
+        nonlocal is_dirty, is_empty_repo
         if active_file_path:
             try:
+                os.makedirs(os.path.dirname(active_file_path), exist_ok=True)
                 with open(active_file_path, "w", encoding="utf-8") as f:
                     f.write(right_text_area.text)
                 is_dirty = False
 
-                # 배지 갱신 로직:
-                # - Create(!) → 유지: 위키에 없음은 변하지 않음
-                # - Update(*) → 유지: 로컬만 수정해도 위키와 다름은 여전함
-                # - Match(공백) → Update(*): 로컬이 바뀌었으므로 이제 위키와 다름
-                rel = os.path.relpath(
-                    active_file_path, os.path.dirname(base_dir)
-                ).replace("\\", "/")
-                if plan_lookup.get(rel) == "Match":
-                    plan_lookup[rel] = "Update"
+                if is_empty_repo and active_file_path == os.path.expanduser("~/.arti-ops/policies/G1_Master.md"):
+                    repo_dir = os.path.dirname(active_file_path)
+                    subprocess.run(["git", "add", "."], cwd=repo_dir, check=True)
+                    subprocess.run(["git", "commit", "-m", "Init G1 policy"], cwd=repo_dir, check=True)
+                    subprocess.run(["git", "branch", "-M", "main"], cwd=repo_dir, check=True)
+                    subprocess.run(["git", "push", "-u", "origin", "main"], cwd=repo_dir, check=True)
+                    is_empty_repo = False
+                    right_text_area.text = right_text_area.text + "\n\n[✅ G1 부트스트랩 및 저장 성공! GitOps 파이프라인이 가동됩니다.]"
+                    update_toolbar()
+                else:
+                    rel = os.path.relpath(active_file_path, os.path.dirname(base_dir)).replace("\\", "/")
+                    if plan_lookup.get(rel) == "Match":
+                        plan_lookup[rel] = "Update"
+                    rebuild_items_badges()
+                    update_left_pane()
 
-                rebuild_items_badges()
-                update_left_pane()
-
+            except subprocess.CalledProcessError as e:
+                right_text_area.text = right_text_area.text + f"\n\n[Git 상태 초기화(Push) 오류: {e}]"
             except Exception as e:
                 right_text_area.text = right_text_area.text + f"\n\n[저장 오류: {e}]"
 
-    # ─── g: G1 등반 (L1 -> G1 BookStack Upsert) ───
+    # ─── g: L1 변환 미리보기 (.agents 파일에 한정, PRD/SSD 제외) ───
     @kb.add("g", filter=Condition(
-        lambda: full_plan is not None and bookstack is not None and not is_edit_mode
-    ))
-    def trigger_global_upsert(event):
-        """l 뷰어를 일시 종료하고 L1 글로벌 스킬을 BookStack 마스터(G1)로 배포하는 다이얼로그를 띄운다."""
-        event.app.exit(result="upsert_global_requested")
-
-    # ─── c: L1 변환 미리보기 (.agents 파일에 한정, PRD/SSD 제외) ───
-    @kb.add("c", filter=Condition(
         lambda: not is_edit_mode
             and active_file_path is not None
             and ".agents" in (active_file_path or "")
     ))
     def trigger_l1_convert(event):
-        """c 키: 현재 파일을 L1 전역 정첵으로 변환하여 우측 패널에 표시한다."""
+        """g 키: 현재 파일을 L1 전역 정첵으로 변환하여 우측 패널에 표시한다."""
         asyncio.ensure_future(_do_l1_convert())
 
     async def _do_l1_convert():
@@ -669,7 +626,7 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                 user_id="viewer",
                 session_id="l1_convert",
                 new_message=Content(role="user", parts=[
-                    Part.from_text(text=f"다음 L3/L2 콘텐츠를 L1 전역 정책으로 변환해주세요:\n\n{original_content}")
+                    Part.from_text(text=f"다음 L3 콘텐츠를 L1 전역 정책으로 변환해주세요:\n\n{original_content}")
                 ])
             ):
                 if event.is_final_response():
@@ -868,16 +825,14 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
             subprocess.run(["pbcopy"], input=content, text=True, check=False)
 
     # l/u 다이얼로그 색상 일치: 두 구역 모두 터미널 기본 배경을 사용
-    viewer_style = Style.from_dict({
-        'bottom-toolbar': 'reverse',
-        'selected':       'bg:#00aa00 #ffffff bold',
-        'header':         'bold #00ffff',
-        'focused-frame frame.border': 'fg:cyan bold',
-    })
+    viewer_style = Style([
+        ('bottom-toolbar', 'bg:#333333 #ffffff'),
+        ('selected',       'bg:#00aa00 #ffffff bold'),
+        ('header',         'bold #00ffff'),
+    ])
 
     # ─── 초기 자동 로드: 첫 유효 항목을 우측 패널에 자동 표시 ───
     _load_preview()
-    update_toolbar()
 
     # ─── Application 루프: upsert 후 런타임에 재진입 ───
     # Application 인스턴스는 재사용이 불가하므로 루프 내에서 매번 생성
@@ -891,32 +846,13 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
         app.timeoutlen = 0.05  # Esc 응답 지연 단축: 기본 500ms → 50ms
         result = await app.run_async()
 
-        # u 키로 요청된 경우: 다이얼로그 실행 후 배지 갱신 후 뷰어로 복귀
-        if result in ("upsert_workspace_requested", "upsert_global_requested") and bookstack:
+        # u 키로 요청된 경우: 다이얼로그 실행 후 배지 갱신 후 늉어로 복귀
+        if result == "upsert_requested" and full_plan and bookstack:
             def get_symbol(action):
                 return {"Create": "!", "Update": "*", "Match": " "}.get(action, " ")
 
             choices = []
-            
-            if result == "upsert_workspace_requested" and full_plan:
-                plan_to_use = full_plan
-                dialog_title = "위키 연동 (BookStack Workspace Upsert)"
-                dialog_text = (
-                    "방향키(↑/↓)와 스페이스바(Space)로 워크스페이스(G2)로 배포할 L2 스킬을 선택하세요.\n"
-                    "[ ! : 신규 추가 | * : 업데이트 대상 | 공백 : 완전 동일 ]"
-                )
-            else:
-                # global plan generate on the fly
-                import logging
-                logging.getLogger(__name__).info("Fetching global plan...")
-                plan_to_use = await bookstack.get_upsert_plan(project_id="global", scope="global")
-                dialog_title = "위키 연동 (BookStack Global Upsert)"
-                dialog_text = (
-                    "방향키(↑/↓)와 스페이스바(Space)로 마스터 영역(G1)으로 배포할 L1 스킬을 선택하세요.\n"
-                    "[ ! : 신규 추가 | * : 업데이트 대상 | 공백 : 완전 동일 ]"
-                )
-
-            for item in plan_to_use:
+            for item in full_plan:
                 # Match(위키와 동일) 항목은 배포 대상이 아니므로 제외
                 if item.get("action") == "Match":
                     continue
@@ -933,22 +869,14 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
                                 display_text += f"\n      ↳ {rel_sub}"
                 choices.append((item, display_text))
 
-            if not choices:
-                from prompt_toolkit.shortcuts import message_dialog
-                await asyncio.to_thread(
-                    message_dialog(
-                        title="알림",
-                        text="현재 배포(Update/Create)할 항목이 없습니다. (위키와 완전 동일)",
-                        style=upsert_style
-                    ).run
-                )
-                continue
-
             # 다이얼로그를 Application 밖에서 (실행 중인 App 없음) 실행 → 스타일 정상 적용
             selected = await asyncio.to_thread(
                 checkboxlist_dialog(
-                    title=dialog_title,
-                    text=dialog_text,
+                    title="위키 연동 (BookStack Upsert)",
+                    text=(
+                        "방향키(↑/↓)와 스페이스바(Space)로 배포할 항목을 선택하세요.\n"
+                        "[ ! : 신규 추가 | * : 위키와 로컈 내용 다름 (업데이트 대상) | 공백 : 컨텐츠 완전 동일 (수정 불필요) ]"
+                    ),
                     values=choices,
                     style=upsert_style
                 ).run
@@ -956,13 +884,12 @@ async def run_list_viewer(plan_lookup, base_dir, full_plan=None, bookstack=None,
 
             if selected:
                 await bookstack.execute_upsert(selected)
-                if result == "upsert_workspace_requested":
-                    for item in selected:
-                        plan_lookup[item["rel_path"]] = "Match"
+                for item in selected:
+                    plan_lookup[item["rel_path"]] = "Match"
                 rebuild_items_badges()
                 update_left_pane()
 
-            # 선택함/안 함/취소 모두 뷰어로 복귀
+            # 선택함/안 함/취소 모두 누어로 복귀
             continue
 
         # q/Esc/Enter 등 일반 종료 → 루프 탈출

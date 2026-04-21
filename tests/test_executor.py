@@ -17,4 +17,4 @@ def test_executor_agent_initialization():
     assert "배포 집행관 'Executor'" in agent.instruction
     assert "write_file" in agent.instruction
     assert "send_summary" in agent.instruction
-    assert agent.model == os.getenv("GEMINI_MODEL_FLASH", "gemini-2.5-flash")
+    assert agent.model == os.getenv("GEMINI_MODEL_FLASH", "gemini-flash-latest")

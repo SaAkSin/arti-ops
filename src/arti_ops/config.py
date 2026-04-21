@@ -39,7 +39,9 @@ class Configurator:
             parser = configparser.ConfigParser()
             parser.read(credentials_file)
             if 'default' in parser:
-                self.global_config = dict(parser['default'])
+                self.global_config.update(dict(parser['default']))
+            if 'github' in parser:
+                self.global_config.update(dict(parser['github']))
                 
         # 2. Setup Global DB Path
         self.db_path = f"sqlite:///{arti_ops_dir}/arti_ops_session.db"
